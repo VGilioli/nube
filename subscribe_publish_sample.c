@@ -81,7 +81,7 @@ u32		lLenProgramUpdate;
 //	ATTENZIONE ---------- OBBLIGATORIO tenere variabile RamProgNewCode[1000] in ultima posizione -----------------
 //	Spazio ProgNewCode in ram (spazio codice)
 u8      RamProgNewCode[1000];
-//	ATTENZIONE ---------- OBBLIGATORIO tenere variabile RamProgNewCode[1000] in ultima posizione -----------------
+//	ATTENZIONE 1---------- OBBLIGATORIO tenere variabile RamProgNewCode[1000] in ultima posizione -----------------
 
 u8      MapBitScene[5];
 

@@ -1167,6 +1167,8 @@ void gestOpcodeWIFI(int byte[]);
 void gestCmdPassThrough(int byte[]);
 void print_json_command(int msg[]);
 
+static bool flag_tx_json_command = false;
+
 
 
 static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, uint16_t topicNameLen,
@@ -1229,6 +1231,9 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 
 
     //mando la risposta
+	flag_tx_json_command=TRUE;
+
+	/*
 	print_json_command(bufferTx);
 	sprintf(Payload, "%s", json_string);
 	//printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(json_string));//, json_string);
@@ -1238,7 +1243,7 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 	rc1 = aws_iot_mqtt_publish(&client1, str1_topic_shadow, strlen(str1_topic_shadow), &paramsQOS0);
 	printf("Publish returned : %d \n", rc1);
-
+*/
 }
 
 
@@ -2187,6 +2192,21 @@ int main(int argc, char **argv) {
 			p_shmem_cenlin->errors_changed = 0;
 		}
 		
+
+		if(flag_tx_json_command == TRUE){
+			flag_tx_json_command = FALSE;
+			print_json_command(bufferTx);
+			sprintf(cPayload, "%s", json_string);
+			//printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(json_string));//, json_string);
+			printf("Send shadow command (len %d )  \n", strlen(cPayload));
+			paramsQOS0.payloadLen = strlen(cPayload);
+			sprintf(str_topic_shadow, "logicafm_99998/response");
+			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+			printf("Publish returned : %d \n", rc);
+		}
+		
+
 
 		t = time(NULL);
 		time_now= *localtime (&t);

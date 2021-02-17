@@ -81,7 +81,7 @@ u32		lLenProgramUpdate;
 //	ATTENZIONE ---------- OBBLIGATORIO tenere variabile RamProgNewCode[1000] in ultima posizione -----------------
 //	Spazio ProgNewCode in ram (spazio codice)
 u8      RamProgNewCode[1000];
-//	ATTENZIONE ---------- OBBLIGATORIO tenere variabile RamProgNewCode[1000] in ultima posizione -----------------
+//	ATTENZIONE 1---------- OBBLIGATORIO tenere variabile RamProgNewCode[1000] in ultima posizione -----------------
 
 u8      MapBitScene[5];
 
@@ -1237,7 +1237,7 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	print_json_command(bufferTx);
 	sprintf(Payload, "%s", json_string);
 	//printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(json_string));//, json_string);
-	printf("Send shadow command (len %d )  \n", strlen(Payload));
+	printf("Send shadow command (len %d ) : %s \n", strlen(Payload), Payload);
 	paramsQOS0.payloadLen = strlen(Payload);
 	sprintf(str1_topic_shadow, "logicafm_99998/response");
 	//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
@@ -1256,10 +1256,10 @@ void print_json_command(int msg[]) {
 	sprintf(json_string, "{\"frame\":\"" );
 	
 	for (j=0; j < msg[0]; j++){
-		sprintf(appo, "%02X", changed[j]);
+		sprintf(appo, "%02X", msg[j]);
 		strcat(json_string, appo);	
 	}
-	sprintf(appo, "\"");
+	sprintf(appo, "\",");
 	strcat(json_string, appo);	
 
     //aggiungo "cu_id":"99998","cu_type":"logicafm"

@@ -1167,8 +1167,8 @@ static int bufferTx[20];
 
 #define MAX_LEN_SHADOW 5*1024
 
-static char Payload[MAX_LEN_SHADOW+1];
-static char str1_topic_shadow[100];
+//static char Payload[MAX_LEN_SHADOW+1];
+//static char str1_topic_shadow[100];
 static char json_string[MAX_LEN_SHADOW+1] = {}; 
 #include "jsmn.h"
 
@@ -1193,15 +1193,15 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	IOT_INFO("RICEVUTO : %.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *) params->payload);
 	char keyString[1024];
 	int resultCode;
-	IoT_Error_t rc1 = FAILURE;
-	AWS_IoT_Client client1;
-	IoT_Publish_Message_Params paramsQOS0;
+	//IoT_Error_t rc1 = FAILURE;
+	//AWS_IoT_Client client1;
+	//IoT_Publish_Message_Params paramsQOS0;
 	jsmn_parser p;
 	jsmntok_t tokens[128]; // a number >= total number of tokens
 	jsmntok_t key;
 	jsmn_init(&p);
 	resultCode = jsmn_parse(&p, (char *) params->payload, params->payloadLen, tokens, 128);
-	// restituisce n token, ogniuno di quali contiene una stringa campo oppure valore 
+	// restituisce n token, ognuno di quali contiene una stringa campo oppure valore 
 	// mi aspetto che siano sempre a 2 a 2 
 	key = tokens[1];
 	unsigned int length = key.end - key.start;
@@ -2256,7 +2256,12 @@ int main(int argc, char **argv) {
 		}
 		
 
+<<<<<<< HEAD
 		if (flag_tx_json_command == TRUE) {
+=======
+		if(flag_tx_json_command == TRUE){
+			printf("FLAG TX JSON = TRUE");
+>>>>>>> ce55f28f2319259f9dd52436610d780143185d63
 			flag_tx_json_command = FALSE;
 			print_json_command(bufferTx);
 			sprintf(cPayload, "%s", json_string);

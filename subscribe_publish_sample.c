@@ -1235,7 +1235,7 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	    flag_tx_json_command=TRUE;
 
 	}else printf("CRC ERROR\n");
-
+	
 }
 
 

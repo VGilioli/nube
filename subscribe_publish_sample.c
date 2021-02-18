@@ -314,7 +314,10 @@ struct shmem_cenlin* p_shmem_cenlin;
 //Lista subcode di OPCODE_LG_CMD_PASS_THROUGH   
 #define 	SUBCODE_TEST_FUNZIONALE			    	0x03
 #define 	SUBCODE_TEST_AUTONOMIA_1H			   	0x04
-
+#define 	SUBCODE_STOP_TEST					   	0x07
+#define 	SUBCODE_DISABILITA_EMERGENZA			0x09
+#define 	SUBCODE_ABILITA_EMERGENZA				0x0A
+#define 	SUBCODE_INIBIZIONE_IMPIANTO				0x0B
 
 
 
@@ -1227,25 +1230,13 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 		if(ctrlCode&0x01)
 			gestOpcodeWIFI(byteF);
 		else gestOpcodeMain(byteF);
+		
+		//mando la risposta
+	    flag_tx_json_command=TRUE;
+
 	}else printf("CRC ERROR\n");
 
-
-    //mando la risposta
-	flag_tx_json_command=TRUE;
-
-	/*
-	print_json_command(bufferTx);
-	sprintf(Payload, "%s", json_string);
-	//printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(json_string));//, json_string);
-	printf("Send shadow command (len %d ) : %s \n", strlen(Payload), Payload);
-	paramsQOS0.payloadLen = strlen(Payload);
-	sprintf(str1_topic_shadow, "logicafm_99998/response");
-	//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
-	rc1 = aws_iot_mqtt_publish(&client1, str1_topic_shadow, strlen(str1_topic_shadow), &paramsQOS0);
-	printf("Publish returned : %d \n", rc1);
-*/
 }
-
 
 
 void print_json_command(int msg[]) {
@@ -1271,8 +1262,6 @@ void print_json_command(int msg[]) {
 	strcat(json_string, appo);
 	printf("json CUCONFIG is : %s \n", json_string);
 }
-
-
 
 
 void convertStringToByte(char* st, int byte[]){
@@ -1311,19 +1300,19 @@ void gestOpcodeMain(int byte[]){
 	switch(byte[2]){
 
 		case  OPCODE_GET_SW_INFO_CU:
-			printf("RX GET SW INFO CU");
+			printf("RX GET SW INFO CU\n");
 		break;
 
 		case  OPCODE_GET_STATUS_ALARM_CU:
-			printf("RX GET_STATUS_ALARM_CU");
+			printf("RX GET_STATUS_ALARM_CU\n");
 		break;
 
 		case  OPCODE_SET_CONFIG_REG_CU            :
-			printf("RX SET_CONFIG_REG_CU            ");
+			printf("RX SET_CONFIG_REG_CU\n");
 		break;
 
 		case  OPCODE_GET_MEASURES: // Risposta: 2 byte Tensione batteria CU (H-L)
-			printf("RX GET MEASURE");
+			printf("RX GET MEASURE\n");
 			//devo leggere V e I sulla cenlin ???? 
 			//preparare la risposta 
 			bufferTx[0]=5;//numBytes 
@@ -1337,7 +1326,7 @@ void gestOpcodeMain(int byte[]){
 
 		case  OPCODE_LG_CMD_PASS_THROUGH: //0x40  
 		    //devo gestire i sotto opcode 
-			printf("RX OPCODE_LG_CMD_PASS_THROUGH");
+			printf("RX OPCODE_LG_CMD_PASS_THROUGH\n");
 			gestCmdPassThrough(byte);
  
 			//devo eseguire la tx  ????
@@ -1345,31 +1334,45 @@ void gestOpcodeMain(int byte[]){
 		break;
 
 		case OPCODE_SET_STATUS_MOD_WIFI:
-			printf("RX OPCODE_SET_STATUS_MOD_WIFI");
+			printf("RX OPCODE_SET_STATUS_MOD_WIFI\n");
+		break;
+
+		default: //subcode non previsto 
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x01;//ctrlCode ERRORE OPCODE NON GESTITO = 0x01
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=0x41;//CRC 
 		break;
 
 
 	}
-
 }
 
 void gestOpcodeWIFI(int byte[]){
 
-	switch(byte[0]){
+	switch(byte[2]){
 		case  OPCODE_GET_SW_INFO:
-			printf("RX GET SW INFO");
+			printf("RX GET SW INFO\n");
+		break;
+
+		default: //opcode non previsto 
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x01;//ctrlCode ERRORE OPCODE NON GESTITO 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=0x41;//CRC 
 		break;
 	}
-
 }
 
 void gestCmdPassThrough(int byte[]){
 	
 	switch(byte[3]){
 		case  SUBCODE_TEST_FUNZIONALE: //0x03 test funzionale + 2 byte address destinatario H-L (0xFFFF = broadcast)
-			printf("TEST FUNZIONALE");
+			printf("TEST FUNZIONALE\n");
 			
-			//TO DO devo chiedere l'esecuzione del test funzionale...
+			//devo chiedere l'esecuzione del test funzionale...
 			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
 			p_shmem_cenlin->message[1] = 41;
@@ -1378,11 +1381,112 @@ void gestCmdPassThrough(int byte[]){
 			bufferTx[0]=0x07;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode
 			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
-			bufferTx[3]=SUBCODE_TEST_FUNZIONALE; //subcode
+			bufferTx[3]=SUBCODE_TEST_FUNZIONALE; //subcode 0x03
             bufferTx[4]=0xFF; 
 			bufferTx[5]=0xFF;
 			bufferTx[6]=0x43;//CRC 
 		break;
+
+		case  SUBCODE_TEST_AUTONOMIA_1H: //0x04 test autonomia + 2 byte address destinatario H-L (0xFFFF = broadcast)
+			printf("TEST Autonomia 1H\n");
+			
+			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = 0x01;
+			//p_shmem_cenlin->message[1] = 41;
+
+			//preparo la risposta 
+			bufferTx[0]=0x07;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode
+			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
+			bufferTx[3]=SUBCODE_TEST_AUTONOMIA_1H; //subcode 0x04
+            bufferTx[4]=0xFF; 
+			bufferTx[5]=0xFF;
+			bufferTx[6]=0x44;//CRC 
+		break;
+
+		case  SUBCODE_STOP_TEST: //0x07 stop test + 2 byte address destinatario H-L (0xFFFF = broadcast)
+			printf("TEST Stop test\n");
+			
+			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = 0x01;
+			//p_shmem_cenlin->message[1] = 41;
+
+			//preparo la risposta 
+			bufferTx[0]=0x07;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode
+			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
+			bufferTx[3]=SUBCODE_STOP_TEST; //subcode 0x07
+            bufferTx[4]=0xFF; 
+			bufferTx[5]=0xFF;
+			bufferTx[6]=0x47;//CRC 
+		break;
+
+		case  SUBCODE_DISABILITA_EMERGENZA: //0x09 disabilita emergenza + 2 byte address destinatario H-L (0xFFFF = broadcast)
+			printf("TEST Disabilita emergenza\n");
+			
+			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = 0x01;
+			//p_shmem_cenlin->message[1] = 41;
+
+			//preparo la risposta 
+			bufferTx[0]=0x07;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode
+			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
+			bufferTx[3]=SUBCODE_DISABILITA_EMERGENZA; //subcode 0x09
+            bufferTx[4]=0xFF; 
+			bufferTx[5]=0xFF;
+			bufferTx[6]=0x49;//CRC 
+		break;
+
+		case  SUBCODE_ABILITA_EMERGENZA: //0x0A abilita emergenza + 2 byte address destinatario H-L (0xFFFF = broadcast)
+			printf("TEST Disabilita emergenza\n");
+			
+			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = 0x01;
+			//p_shmem_cenlin->message[1] = 41;
+
+			//preparo la risposta 
+			bufferTx[0]=0x07;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode
+			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
+			bufferTx[3]=SUBCODE_ABILITA_EMERGENZA; //subcode 0x0A
+            bufferTx[4]=0xFF; 
+			bufferTx[5]=0xFF;
+			bufferTx[6]=0x4A;//CRC 
+		break;
+
+		case  SUBCODE_INIBIZIONE_IMPIANTO: //0x0B inibizione impianto + 2 byte address destinatario H-L (0xFFFF = broadcast)
+			printf("TEST Disabilita emergenza\n");
+			
+			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = 0x01;
+			//p_shmem_cenlin->message[1] = 41;
+
+			//preparo la risposta 
+			bufferTx[0]=0x07;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode
+			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
+			bufferTx[3]=SUBCODE_INIBIZIONE_IMPIANTO; //subcode 0x0B
+            bufferTx[4]=0xFF; 
+			bufferTx[5]=0xFF;
+			bufferTx[6]=0x4B;//CRC 
+		break;
+
+		default: //subcode non previsto 
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x01;//ctrlCode ERRORE OPCODE NON GESTITO 
+ 			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
+			bufferTx[3]=0x41;//CRC 
+		break;
+		
+
+
 	}	
 }
 

@@ -110,7 +110,18 @@ u16 gTotNodi;
 int num_shadow;
 
 
+typedef struct cenlinStatus {
+	u32 StateGsm;
+	u8 StateGsmReg;
+	u8 StateSim;
+	u8 StateGsmSignalQuality;
+	u8 StateSupinv[8];
+	u32 StateEth0;
+	u8 supinvFlags[8];
+	u16 swVer;
+	u8 testInProgress;
 
+} cenlinStatusStruct;
 
 struct shmem_cenlin {
 
@@ -125,6 +136,7 @@ struct shmem_cenlin {
 	u8 power[992];
 	u8 new_message;
 	u8 message[10];
+	cenlinStatusStruct statoCenlin;
 
 };
 
@@ -1971,6 +1983,57 @@ void print_json_status(void) {
 	sprintf(appo, "%04X\"", p_shmem_cenlin->gTotNodi);
 	strcat(json_string, appo);	
 
+	sprintf(appo, ",\"testRunning\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.testInProgress);
+	strcat(json_string, appo);	
+
+	sprintf(appo, ",\"qualitaGSM\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.StateGsmSignalQuality);
+	strcat(json_string, appo);	
+
+	sprintf(appo, ",\"statoGSM\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.StateGsm);
+	strcat(json_string, appo);	
+
+	sprintf(appo, ",\"statoGSMreg\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.StateGsmReg);
+	strcat(json_string, appo);	
+
+	sprintf(appo, ",\"statoSim\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.StateSim);
+	strcat(json_string, appo);	
+
+	sprintf(appo, ",\"statoEth0\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.StateEth0);
+	strcat(json_string, appo);	
+
+	sprintf(appo, ",\"swVerCentrale\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.swVer);
+	strcat(json_string, appo);	
+
+
+	sprintf(appo, ",\"statoSupinv\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "%02X%02X%02X%02X%02X%02X%02X%02X\"", p_shmem_cenlin->statoCenlin.StateSupinv[0], p_shmem_cenlin->statoCenlin.StateSupinv[1], p_shmem_cenlin->statoCenlin.StateSupinv[2], 
+                                                     	p_shmem_cenlin->statoCenlin.StateSupinv[3], p_shmem_cenlin->statoCenlin.StateSupinv[4], p_shmem_cenlin->statoCenlin.StateSupinv[5],
+													    p_shmem_cenlin->statoCenlin.StateSupinv[6], p_shmem_cenlin->statoCenlin.StateSupinv[7]);
+	strcat(json_string, appo);	
+
+
+	sprintf(appo, ",\"supinvFlags\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "%02X%02X%02X%02X%02X%02X%02X%02X\"", p_shmem_cenlin->statoCenlin.supinvFlags[0], p_shmem_cenlin->statoCenlin.supinvFlags[1], p_shmem_cenlin->statoCenlin.supinvFlags[2], 
+                                                     	p_shmem_cenlin->statoCenlin.supinvFlags[3], p_shmem_cenlin->statoCenlin.supinvFlags[4], p_shmem_cenlin->statoCenlin.supinvFlags[5],
+													    p_shmem_cenlin->statoCenlin.supinvFlags[6], p_shmem_cenlin->statoCenlin.supinvFlags[7]);
+	strcat(json_string, appo);	
+
 	sprintf(appo, "}}}");
 	strcat(json_string, appo);
 
@@ -2297,8 +2360,12 @@ int main(int argc, char **argv) {
 		}
 		
 
+<<<<<<< HEAD
+		if (flag_tx_json_command == TRUE) {
+=======
 		if(flag_tx_json_command == TRUE){
 			printf("FLAG TX JSON = TRUE");
+>>>>>>> ce55f28f2319259f9dd52436610d780143185d63
 			flag_tx_json_command = FALSE;
 			print_json_command(bufferTx);
 			sprintf(cPayload, "%s", json_string);
@@ -2369,7 +2436,6 @@ int main(int argc, char **argv) {
 			published |= SHADOW_ENERGY_TIME_PUBLISHED;
 		}																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																																												
 
-		
 		if((published & SHADOW_ENERGY_TIME_PUBLISHED) != 0 ) {
 			print_json_status();
 			sprintf(cPayload, "%s", json_string);	
@@ -2379,6 +2445,7 @@ int main(int argc, char **argv) {
 			printf("Publish returned : %d \n", rc);
 			published &=~SHADOW_ENERGY_TIME_PUBLISHED;
 		}
+
 		if(0 != published) {
 			printf("Trigghero la lamda perche' e' cambiato %d \n", published);
 			print_json_cuconfig();
@@ -2429,7 +2496,7 @@ int main(int argc, char **argv) {
 			publishCount--;
 		}
 		*/
-		sleep(10);
+		sleep(5);
 	}
 
 	// Wait for all the messages to be received vittorio

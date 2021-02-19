@@ -120,6 +120,7 @@ typedef struct cenlinStatus {
 	u8 supinvFlags[8];
 	u16 swVer;
 	u8 testInProgress;
+	u32 Timestamp;
 
 } cenlinStatusStruct;
 
@@ -1317,6 +1318,16 @@ void gestOpcodeMain(int byte[]){
 
 		case  OPCODE_GET_STATUS_ALARM_CU:
 			printf("RX GET_STATUS_ALARM_CU\n");
+			p_shmem_cenlin->status_changed = 1;
+			p_shmem_cenlin->errors_changed = 1;
+			p_shmem_cenlin->power_changed = 1;
+						//preparare la risposta 
+			bufferTx[0]=5;//numBytes 
+			bufferTx[1]=0;//ctrlCode
+			bufferTx[2]=OPCODE_GET_MEASURES; //ripeto l'opcode nella risposta
+			bufferTx[3]=0; //0=OK 1=KO e poi mando i dati in una shadow???? oppure devo mettere qui i dati????
+            bufferTx[4]=4; //CRC 
+
 		break;
 
 		case  OPCODE_SET_CONFIG_REG_CU            :
@@ -1403,9 +1414,9 @@ void gestCmdPassThrough(int byte[]){
 			printf("TEST Autonomia 1H\n");
 			
 			//TO DO devo chiedere l'esecuzione del test autonomia...
-			//p_shmem_cenlin->new_message = 1;
-			//p_shmem_cenlin->message[0] = 0x01;
-			//p_shmem_cenlin->message[1] = 41;
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = 0x01;
+			p_shmem_cenlin->message[1] = 42;
 
 			//preparo la risposta 
 			bufferTx[0]=0x07;//numBytes 
@@ -1421,9 +1432,9 @@ void gestCmdPassThrough(int byte[]){
 			printf("TEST Stop test\n");
 			
 			//TO DO devo chiedere l'esecuzione del test autonomia...
-			//p_shmem_cenlin->new_message = 1;
-			//p_shmem_cenlin->message[0] = 0x01;
-			//p_shmem_cenlin->message[1] = 41;
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = 0x01;
+			p_shmem_cenlin->message[1] = 43;
 
 			//preparo la risposta 
 			bufferTx[0]=0x07;//numBytes 
@@ -1983,6 +1994,16 @@ void print_json_status(void) {
 	sprintf(appo, "%04X\"", p_shmem_cenlin->gTotNodi);
 	strcat(json_string, appo);	
 
+	sprintf(appo, ",\"timestamp\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "%d\"", p_shmem_cenlin->statoCenlin.Timestamp);
+	strcat(json_string, appo);	
+
+	sprintf(appo, ",\"timeZone\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "01\"");
+	strcat(json_string, appo);	
+
 	sprintf(appo, ",\"testRunning\":\"");
 	strcat(json_string, appo);	
 	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.testInProgress);
@@ -2068,7 +2089,7 @@ void print_json_errors(void) {
 	sprintf(appo, "}}}");
 	strcat(json_string, appo);
 
-	printf("json status is : %s \n", json_string);
+	printf("json errors is : %s \n", json_string);
 
 }
 
@@ -2360,12 +2381,7 @@ int main(int argc, char **argv) {
 		}
 		
 
-<<<<<<< HEAD
-		if (flag_tx_json_command == TRUE) {
-=======
 		if(flag_tx_json_command == TRUE){
-			printf("FLAG TX JSON = TRUE");
->>>>>>> ce55f28f2319259f9dd52436610d780143185d63
 			flag_tx_json_command = FALSE;
 			print_json_command(bufferTx);
 			sprintf(cPayload, "%s", json_string);

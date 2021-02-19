@@ -1333,6 +1333,14 @@ void gestOpcodeMain(int byte[]){
 
 		case  OPCODE_GET_STATUS_ALARM_CU:
 			printf("RX GET_STATUS_ALARM_CU\n");
+
+			bufferTx[0]=5;//numBytes 
+			bufferTx[1]=0;//ctrlCode
+			bufferTx[2]=OPCODE_GET_MEASURES; //ripeto l'opcode nella risposta
+			bufferTx[3]=0; //0=OK 1=KO e poi mando i dati in una shadow???? oppure devo mettere qui i dati????
+            bufferTx[4]=calcCRC(bufferTx); //CRC 
+
+
 		break;
 
 		case  OPCODE_SET_CONFIG_REG_CU            :
@@ -1463,7 +1471,7 @@ void gestCmdPassThrough(int byte[]){
 		case  SUBCODE_DISABILITA_EMERGENZA: //0x09 disabilita emergenza + 2 byte address destinatario H-L (0xFFFF = broadcast)
 			printf("TEST Disabilita emergenza\n");
 			
-			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//TO DO devo chiedere la disabilitazione emergenza...
 			//p_shmem_cenlin->new_message = 1;
 			//p_shmem_cenlin->message[0] = 0x01;
 			//p_shmem_cenlin->message[1] = 41;
@@ -1481,7 +1489,7 @@ void gestCmdPassThrough(int byte[]){
 		case  SUBCODE_ABILITA_EMERGENZA: //0x0A abilita emergenza + 2 byte address destinatario H-L (0xFFFF = broadcast)
 			printf("TEST Disabilita emergenza\n");
 			
-			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//TO DO devo chiedere abilitazione emergenza...
 			//p_shmem_cenlin->new_message = 1;
 			//p_shmem_cenlin->message[0] = 0x01;
 			//p_shmem_cenlin->message[1] = 41;
@@ -1499,7 +1507,7 @@ void gestCmdPassThrough(int byte[]){
 		case  SUBCODE_INIBIZIONE_IMPIANTO: //0x0B inibizione impianto + 2 byte address destinatario H-L (0xFFFF = broadcast)
 			printf("TEST Disabilita emergenza\n");
 			
-			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//TO DO devo chiedere l'inibizione dell'impianto...
 			//p_shmem_cenlin->new_message = 1;
 			//p_shmem_cenlin->message[0] = 0x01;
 			//p_shmem_cenlin->message[1] = 41;

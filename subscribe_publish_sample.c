@@ -120,6 +120,7 @@ typedef struct cenlinStatus {
 	u8 supinvFlags[8];
 	u16 swVer;
 	u8 testInProgress;
+	u32 Timestamp;
 
 } cenlinStatusStruct;
 
@@ -1332,13 +1333,33 @@ void gestOpcodeMain(int byte[]){
 		break;
 
 		case  OPCODE_GET_STATUS_ALARM_CU:
+			// byte0: TIPO_DISPOSITIVO
+			// byte1: uStatusDispositivo.lByte.Low;
+			// byte2: uStatusDispositivo.lByte.MediumL;
+			// byte3: uSettingsReg.cReg;
+			// byte4: uErrori.iByte.Low;
+			// byte5: uErrori.iByte.High;
+			// byte6: uStatusModuloWiFi.cReg;
+			// byte7: uStatusDispositivo.lByte.MediumH;
+			// byte8: uStatusDispositivo.lByte.High;
 			printf("RX GET_STATUS_ALARM_CU\n");
-
-			bufferTx[0]=5;//numBytes 
-			bufferTx[1]=0;//ctrlCode
-			bufferTx[2]=OPCODE_GET_MEASURES; //ripeto l'opcode nella risposta
-			bufferTx[3]=0; //0=OK 1=KO e poi mando i dati in una shadow???? oppure devo mettere qui i dati????
-            bufferTx[4]=calcCRC(bufferTx); //CRC 
+			p_shmem_cenlin->status_changed = 1;
+			p_shmem_cenlin->errors_changed = 1;
+			p_shmem_cenlin->power_changed = 1;
+						//preparare la risposta 
+			bufferTx[0] = 13;//numBytes 
+			bufferTx[1] = 0;//ctrlCode
+			bufferTx[2] = OPCODE_GET_STATUS_ALARM_CU; //ripeto l'opcode nella risposta
+			bufferTx[3] = 0;  
+			bufferTx[4] = 0;  
+			bufferTx[5] = 0;  
+			bufferTx[6] = 0;  
+			bufferTx[7] = 0;  
+			bufferTx[8] = 0;  
+			bufferTx[9] = 0; 
+			bufferTx[10] = 0;  
+			bufferTx[11] = 0;  
+            bufferTx[12] = calcCRC(bufferTx); //CRC 
 
 
 		break;
@@ -1435,7 +1456,7 @@ void gestCmdPassThrough(int byte[]){
 		case  SUBCODE_TEST_AUTONOMIA_1H: //0x04 test autonomia + 2 byte address destinatario H-L (0xFFFF = broadcast)
 			printf("TEST Autonomia 1H\n");
 			
-			//devo chiedere l'esecuzione del test autonomia...
+			//TO DO devo chiedere l'esecuzione del test autonomia...
 			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
 			p_shmem_cenlin->message[1] = 42;
@@ -1941,14 +1962,14 @@ void print_json_energy_and_time(u8 quale_shadow) {
 		}
 	}
 
-	sprintf(appo, ",\"numLamp\":\"");
+	sprintf(appo, ",\"numLamp\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%04X\"", p_shmem_cenlin->gTotNodi);
+	sprintf(appo, "%d", p_shmem_cenlin->gTotNodi);
 	strcat(json_string, appo);	
 
-	sprintf(appo, ",\"firstLamp\":\"");
+	sprintf(appo, ",\"firstLamp\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%04X\"", quale_shadow*31);
+	sprintf(appo, "%d", quale_shadow*31);
 	strcat(json_string, appo);	
 
 
@@ -2009,9 +2030,19 @@ void print_json_status(void) {
 	strcat(json_string, appo);
 	//}
 
-	sprintf(appo, ",\"numLamp\":\"");
+	sprintf(appo, ",\"numLamp\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%04X\"", p_shmem_cenlin->gTotNodi);
+	sprintf(appo, "%d", p_shmem_cenlin->gTotNodi);
+	strcat(json_string, appo);	
+
+	sprintf(appo, ",\"timestamp\":");
+	strcat(json_string, appo);	
+	sprintf(appo, "%d", p_shmem_cenlin->statoCenlin.Timestamp);
+	strcat(json_string, appo);	
+
+	sprintf(appo, ",\"timeZone\":\"");
+	strcat(json_string, appo);	
+	sprintf(appo, "01\"");
 	strcat(json_string, appo);	
 
 	sprintf(appo, ",\"testRunning\":\"");
@@ -2019,9 +2050,9 @@ void print_json_status(void) {
 	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.testInProgress);
 	strcat(json_string, appo);	
 
-	sprintf(appo, ",\"qualitaGSM\":\"");
+	sprintf(appo, ",\"qualitaGSM\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.StateGsmSignalQuality);
+	sprintf(appo, "%d", p_shmem_cenlin->statoCenlin.StateGsmSignalQuality);
 	strcat(json_string, appo);	
 
 	sprintf(appo, ",\"statoGSM\":\"");
@@ -2091,15 +2122,15 @@ void print_json_errors(void) {
 	sprintf(appo, "\"");
 	strcat(json_string, appo);
 	//}
-	sprintf(appo, ",\"numLamp\":\"");
+	sprintf(appo, ",\"numLamp\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%04X\"", p_shmem_cenlin->gTotNodi);
+	sprintf(appo, "%d", p_shmem_cenlin->gTotNodi);
 	strcat(json_string, appo);	
 
 	sprintf(appo, "}}}");
 	strcat(json_string, appo);
 
-	printf("json status is : %s \n", json_string);
+	printf("json errors is : %s \n", json_string);
 
 }
 

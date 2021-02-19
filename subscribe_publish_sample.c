@@ -324,13 +324,17 @@ struct shmem_cenlin* p_shmem_cenlin;
 #define 	OPCODE_START_OTA_BY_CLOUD           	0x70    
 #define 	OPCODE_START_OTA_CUSTOM_BY_CLOUD    	0x71
 
-//Lista subcode di OPCODE_LG_CMD_PASS_THROUGH   
+//Lista subcode di OPCODE_LG_CMD_PASS_THROUGH  
+#define 	SUBCODE_CICLO_POLL_COMPLETO				0x02 
 #define 	SUBCODE_TEST_FUNZIONALE			    	0x03
 #define 	SUBCODE_TEST_AUTONOMIA_1H			   	0x04
+#define 	SUBCODE_ACCENSIONE_INCONDIZIONATA		0x06
 #define 	SUBCODE_STOP_TEST					   	0x07
 #define 	SUBCODE_DISABILITA_EMERGENZA			0x09
 #define 	SUBCODE_ABILITA_EMERGENZA				0x0A
 #define 	SUBCODE_INIBIZIONE_IMPIANTO				0x0B
+#define		SUBCODE_CANCELLA_ERRORI					0x0C
+#define		SUBCODE_BLINK_LAMPADA_ON_OFF			0x0D
 
 
 
@@ -1178,6 +1182,7 @@ static char json_string[MAX_LEN_SHADOW+1] = {};
 
 void convertStringToByte(char* st, int byte[]);
 bool checkCRC(int byte[]);
+unsigned char calcCRC(int byte[]);
 void gestOpcodeMain(int byte[]);
 void gestOpcodeWIFI(int byte[]);
 void gestCmdPassThrough(int byte[]);
@@ -1248,7 +1253,7 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	    flag_tx_json_command=TRUE;
 
 	}else printf("CRC ERROR\n");
-
+	
 }
 
 
@@ -1297,7 +1302,7 @@ void convertStringToByte(char* st, int byte[]){
 //CRC somma di tutti i byte 
 bool checkCRC(int byte[]){
      
-	 unsigned char sum;
+	 unsigned char sum = 0;
 	 int len = byte[0];
 	 for (int i=1; i<(len-1); i++){
 		 sum^=byte[i];
@@ -1306,6 +1311,17 @@ bool checkCRC(int byte[]){
 	 	return TRUE;
 	 else return FALSE;	 
 }
+
+unsigned char calcCRC(int byte[]){
+     
+	 unsigned char sum = 0;
+	 int len = byte[0];
+	 for (int i=1; i<(len-1); i++){
+		 sum^=byte[i];
+	 }
+	 return sum;	
+}
+
 
 void gestOpcodeMain(int byte[]){
     
@@ -1317,16 +1333,34 @@ void gestOpcodeMain(int byte[]){
 		break;
 
 		case  OPCODE_GET_STATUS_ALARM_CU:
+			// byte0: TIPO_DISPOSITIVO
+			// byte1: uStatusDispositivo.lByte.Low;
+			// byte2: uStatusDispositivo.lByte.MediumL;
+			// byte3: uSettingsReg.cReg;
+			// byte4: uErrori.iByte.Low;
+			// byte5: uErrori.iByte.High;
+			// byte6: uStatusModuloWiFi.cReg;
+			// byte7: uStatusDispositivo.lByte.MediumH;
+			// byte8: uStatusDispositivo.lByte.High;
 			printf("RX GET_STATUS_ALARM_CU\n");
 			p_shmem_cenlin->status_changed = 1;
 			p_shmem_cenlin->errors_changed = 1;
 			p_shmem_cenlin->power_changed = 1;
 						//preparare la risposta 
-			bufferTx[0]=5;//numBytes 
-			bufferTx[1]=0;//ctrlCode
-			bufferTx[2]=OPCODE_GET_MEASURES; //ripeto l'opcode nella risposta
-			bufferTx[3]=0; //0=OK 1=KO e poi mando i dati in una shadow???? oppure devo mettere qui i dati????
-            bufferTx[4]=4; //CRC 
+			bufferTx[0] = 13;//numBytes 
+			bufferTx[1] = 0;//ctrlCode
+			bufferTx[2] = OPCODE_GET_STATUS_ALARM_CU; //ripeto l'opcode nella risposta
+			bufferTx[3] = 0;  
+			bufferTx[4] = 0;  
+			bufferTx[5] = 0;  
+			bufferTx[6] = 0;  
+			bufferTx[7] = 0;  
+			bufferTx[8] = 0;  
+			bufferTx[9] = 0; 
+			bufferTx[10] = 0;  
+			bufferTx[11] = 0;  
+            bufferTx[12] = calcCRC(bufferTx); //CRC 
+
 
 		break;
 
@@ -1342,18 +1376,27 @@ void gestOpcodeMain(int byte[]){
 			bufferTx[1]=0;//ctrlCode
 			bufferTx[2]=OPCODE_GET_MEASURES; //ripeto l'opcode nella risposta
 			bufferTx[3]=0; //0=OK 1=KO e poi mando i dati in una shadow???? oppure devo mettere qui i dati????
-            bufferTx[4]=4; //CRC 
-			//devo eseguire la tx  ????
+            bufferTx[4]=calcCRC(bufferTx); //CRC 
 			//shadow ????
 		break;
+
+		case OPCODE_SET_DATA_ORA:
+			printf("RX SET DATA ORA\n");
+		break;
+
+		case OPCODE_GET_DATA_ORA:
+			printf("RX GET DATA ORA\n");
+		break;
+
+		case OPCODE_GET_DATI_IMPIANTO:
+			printf("RX GET DATI IMPIANTO\n");
+		break;
+
 
 		case  OPCODE_LG_CMD_PASS_THROUGH: //0x40  
 		    //devo gestire i sotto opcode 
 			printf("RX OPCODE_LG_CMD_PASS_THROUGH\n");
 			gestCmdPassThrough(byte);
- 
-			//devo eseguire la tx  ????
-			//shadow ????
 		break;
 
 		case OPCODE_SET_STATUS_MOD_WIFI:
@@ -1365,7 +1408,7 @@ void gestOpcodeMain(int byte[]){
 			bufferTx[0]=0x04;//numBytes 
 			bufferTx[1]=0x01;//ctrlCode ERRORE OPCODE NON GESTITO = 0x01
  			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
-			bufferTx[3]=0x41;//CRC 
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
 		break;
 
 
@@ -1384,7 +1427,7 @@ void gestOpcodeWIFI(int byte[]){
 			bufferTx[0]=0x04;//numBytes 
 			bufferTx[1]=0x01;//ctrlCode ERRORE OPCODE NON GESTITO 
  			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
-			bufferTx[3]=0x41;//CRC 
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
 		break;
 	}
 }
@@ -1407,7 +1450,7 @@ void gestCmdPassThrough(int byte[]){
 			bufferTx[3]=SUBCODE_TEST_FUNZIONALE; //subcode 0x03
             bufferTx[4]=0xFF; 
 			bufferTx[5]=0xFF;
-			bufferTx[6]=0x43;//CRC 
+			bufferTx[6]=calcCRC(bufferTx);//CRC 
 		break;
 
 		case  SUBCODE_TEST_AUTONOMIA_1H: //0x04 test autonomia + 2 byte address destinatario H-L (0xFFFF = broadcast)
@@ -1425,13 +1468,13 @@ void gestCmdPassThrough(int byte[]){
 			bufferTx[3]=SUBCODE_TEST_AUTONOMIA_1H; //subcode 0x04
             bufferTx[4]=0xFF; 
 			bufferTx[5]=0xFF;
-			bufferTx[6]=0x44;//CRC 
+			bufferTx[6]=calcCRC(bufferTx);//CRC 
 		break;
 
 		case  SUBCODE_STOP_TEST: //0x07 stop test + 2 byte address destinatario H-L (0xFFFF = broadcast)
 			printf("TEST Stop test\n");
 			
-			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//devo chiedere l'esecuzione dello stop test ...
 			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
 			p_shmem_cenlin->message[1] = 43;
@@ -1443,13 +1486,13 @@ void gestCmdPassThrough(int byte[]){
 			bufferTx[3]=SUBCODE_STOP_TEST; //subcode 0x07
             bufferTx[4]=0xFF; 
 			bufferTx[5]=0xFF;
-			bufferTx[6]=0x47;//CRC 
+			bufferTx[6]=calcCRC(bufferTx);//CRC 
 		break;
 
 		case  SUBCODE_DISABILITA_EMERGENZA: //0x09 disabilita emergenza + 2 byte address destinatario H-L (0xFFFF = broadcast)
 			printf("TEST Disabilita emergenza\n");
 			
-			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//TO DO devo chiedere la disabilitazione emergenza...
 			//p_shmem_cenlin->new_message = 1;
 			//p_shmem_cenlin->message[0] = 0x01;
 			//p_shmem_cenlin->message[1] = 41;
@@ -1461,13 +1504,13 @@ void gestCmdPassThrough(int byte[]){
 			bufferTx[3]=SUBCODE_DISABILITA_EMERGENZA; //subcode 0x09
             bufferTx[4]=0xFF; 
 			bufferTx[5]=0xFF;
-			bufferTx[6]=0x49;//CRC 
+			bufferTx[6]=calcCRC(bufferTx);//CRC 
 		break;
 
 		case  SUBCODE_ABILITA_EMERGENZA: //0x0A abilita emergenza + 2 byte address destinatario H-L (0xFFFF = broadcast)
 			printf("TEST Disabilita emergenza\n");
 			
-			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//TO DO devo chiedere abilitazione emergenza...
 			//p_shmem_cenlin->new_message = 1;
 			//p_shmem_cenlin->message[0] = 0x01;
 			//p_shmem_cenlin->message[1] = 41;
@@ -1479,13 +1522,13 @@ void gestCmdPassThrough(int byte[]){
 			bufferTx[3]=SUBCODE_ABILITA_EMERGENZA; //subcode 0x0A
             bufferTx[4]=0xFF; 
 			bufferTx[5]=0xFF;
-			bufferTx[6]=0x4A;//CRC 
+			bufferTx[6]=calcCRC(bufferTx);//CRC 
 		break;
 
 		case  SUBCODE_INIBIZIONE_IMPIANTO: //0x0B inibizione impianto + 2 byte address destinatario H-L (0xFFFF = broadcast)
 			printf("TEST Disabilita emergenza\n");
 			
-			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//TO DO devo chiedere l'inibizione dell'impianto...
 			//p_shmem_cenlin->new_message = 1;
 			//p_shmem_cenlin->message[0] = 0x01;
 			//p_shmem_cenlin->message[1] = 41;
@@ -1497,7 +1540,7 @@ void gestCmdPassThrough(int byte[]){
 			bufferTx[3]=SUBCODE_INIBIZIONE_IMPIANTO; //subcode 0x0B
             bufferTx[4]=0xFF; 
 			bufferTx[5]=0xFF;
-			bufferTx[6]=0x4B;//CRC 
+			bufferTx[6]=calcCRC(bufferTx);//CRC 
 		break;
 
 		default: //subcode non previsto 
@@ -1505,11 +1548,9 @@ void gestCmdPassThrough(int byte[]){
 			bufferTx[0]=0x04;//numBytes 
 			bufferTx[1]=0x01;//ctrlCode ERRORE OPCODE NON GESTITO 
  			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
-			bufferTx[3]=0x41;//CRC 
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
 		break;
 		
-
-
 	}	
 }
 
@@ -1921,14 +1962,14 @@ void print_json_energy_and_time(u8 quale_shadow) {
 		}
 	}
 
-	sprintf(appo, ",\"numLamp\":\"");
+	sprintf(appo, ",\"numLamp\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%04X\"", p_shmem_cenlin->gTotNodi);
+	sprintf(appo, "%d", p_shmem_cenlin->gTotNodi);
 	strcat(json_string, appo);	
 
-	sprintf(appo, ",\"firstLamp\":\"");
+	sprintf(appo, ",\"firstLamp\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%04X\"", quale_shadow*31);
+	sprintf(appo, "%d", quale_shadow*31);
 	strcat(json_string, appo);	
 
 
@@ -1989,14 +2030,14 @@ void print_json_status(void) {
 	strcat(json_string, appo);
 	//}
 
-	sprintf(appo, ",\"numLamp\":\"");
+	sprintf(appo, ",\"numLamp\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%04X\"", p_shmem_cenlin->gTotNodi);
+	sprintf(appo, "%d", p_shmem_cenlin->gTotNodi);
 	strcat(json_string, appo);	
 
-	sprintf(appo, ",\"timestamp\":\"");
+	sprintf(appo, ",\"timestamp\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%d\"", p_shmem_cenlin->statoCenlin.Timestamp);
+	sprintf(appo, "%d", p_shmem_cenlin->statoCenlin.Timestamp);
 	strcat(json_string, appo);	
 
 	sprintf(appo, ",\"timeZone\":\"");
@@ -2009,9 +2050,9 @@ void print_json_status(void) {
 	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.testInProgress);
 	strcat(json_string, appo);	
 
-	sprintf(appo, ",\"qualitaGSM\":\"");
+	sprintf(appo, ",\"qualitaGSM\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%04X\"", p_shmem_cenlin->statoCenlin.StateGsmSignalQuality);
+	sprintf(appo, "%d", p_shmem_cenlin->statoCenlin.StateGsmSignalQuality);
 	strcat(json_string, appo);	
 
 	sprintf(appo, ",\"statoGSM\":\"");
@@ -2081,9 +2122,9 @@ void print_json_errors(void) {
 	sprintf(appo, "\"");
 	strcat(json_string, appo);
 	//}
-	sprintf(appo, ",\"numLamp\":\"");
+	sprintf(appo, ",\"numLamp\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "%04X\"", p_shmem_cenlin->gTotNodi);
+	sprintf(appo, "%d", p_shmem_cenlin->gTotNodi);
 	strcat(json_string, appo);	
 
 	sprintf(appo, "}}}");
@@ -2381,7 +2422,7 @@ int main(int argc, char **argv) {
 		}
 		
 
-		if(flag_tx_json_command == TRUE){
+		if (flag_tx_json_command == TRUE) {
 			flag_tx_json_command = FALSE;
 			print_json_command(bufferTx);
 			sprintf(cPayload, "%s", json_string);

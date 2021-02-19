@@ -1421,7 +1421,7 @@ void gestCmdPassThrough(int byte[]){
 			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
 			p_shmem_cenlin->message[1] = 41;
-
+            printf("ab");
 			//preparo la risposta 
 			bufferTx[0]=0x07;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode

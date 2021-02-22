@@ -1456,7 +1456,7 @@ void gestCmdPassThrough(int byte[]){
 		case  SUBCODE_TEST_AUTONOMIA_1H: //0x04 test autonomia + 2 byte address destinatario H-L (0xFFFF = broadcast)
 			printf("TEST Autonomia 1H\n");
 			
-			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//devo chiedere l'esecuzione del test autonomia...
 			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
 			p_shmem_cenlin->message[1] = 42;

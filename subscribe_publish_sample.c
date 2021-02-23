@@ -136,7 +136,7 @@ struct shmem_cenlin {
 	u16 gTotNodi;
 	u8 power[992];
 	u8 new_message;
-	u8 message[10];
+	u8 message[100];
 	cenlinStatusStruct statoCenlin;
 
 };
@@ -1433,6 +1433,8 @@ void gestOpcodeMain(int byte[]){
 			p_shmem_cenlin->message[2] = byte[4];
 			p_shmem_cenlin->message[3] = byte[5];
 			p_shmem_cenlin->message[4] = byte[6];
+			p_shmem_cenlin->message[5] = byte[7];
+			p_shmem_cenlin->message[6] = byte[8];
 
 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
@@ -1450,6 +1452,8 @@ void gestOpcodeMain(int byte[]){
 			p_shmem_cenlin->message[2] = byte[4];
 			p_shmem_cenlin->message[3] = byte[5];
 			p_shmem_cenlin->message[4] = byte[6];
+			p_shmem_cenlin->message[5] = byte[7];
+			p_shmem_cenlin->message[6] = byte[8];
 
 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
@@ -1502,6 +1506,38 @@ void gestOpcodeMain(int byte[]){
 		case OPCODE_SET_STATUS_MOD_WIFI:
 			printf("RX OPCODE_SET_STATUS_MOD_WIFI\n");
 		break;
+
+		case OPCODE_SET_NOME_IMPIANTO:
+			printf("RX OPCODE_SET NOME IMPIANTO\n");
+
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_NOME_IMPIANTO;
+			for (int i=3;i<byte[0]-1;i++)
+				p_shmem_cenlin->message[i-2] = byte[i];
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;
+
+		/*case OPCODE_GET_NOME_IMPIANTO:
+			printf("RX OPCODE_GET NOME IMPIANTO\n");
+
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_NOME_IMPIANTO;
+			for (i=3;i<byte[0]-1;i++)
+				p_shmem_cenlin->message[i-2] = byte[i];
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;*/
 
 		default: //subcode non previsto 
 			//preparo la risposta 

@@ -1264,7 +1264,7 @@ void print_json_command(int msg[]) {
     int i = 0;
 	int j = 0;
 	char appo[MAX_LEN_SHADOW+1];
-	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
+	
 	sprintf(json_string, "{\"frame\":\"" );
 	
 	for (j=0; j < msg[0]; j++){
@@ -1375,11 +1375,13 @@ void gestOpcodeMain(int byte[]){
 			printf("RX GET MEASURE\n");
 			//devo leggere V e I sulla cenlin ???? 
 			//preparare la risposta 
-			bufferTx[0]=5;//numBytes 
+			bufferTx[0]=7;//numBytes 
 			bufferTx[1]=0;//ctrlCode
 			bufferTx[2]=OPCODE_GET_MEASURES; //ripeto l'opcode nella risposta
 			bufferTx[3]=0; //0=OK 1=KO e poi mando i dati in una shadow???? oppure devo mettere qui i dati????
-            bufferTx[4]=calcCRC(bufferTx); //CRC 
+			bufferTx[4]=0; //tensione batteria H
+			bufferTx[5]=0; //tensione batteria L
+            bufferTx[6]=calcCRC(bufferTx); //CRC 
 			//shadow ????
 		break;
 
@@ -1403,31 +1405,34 @@ void gestOpcodeMain(int byte[]){
 			bufferTx[0]=0x14;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode 
  			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
-			bufferTx[3] = 0;  
-			bufferTx[4] = 0;  
-			bufferTx[5] = 0;  
-			bufferTx[6] = 0;  
-			bufferTx[7] = 0;  
-			bufferTx[8] = 0;  
-			bufferTx[9] = 0; 
-			bufferTx[10] = 0;  
-			bufferTx[11] = 0;  
-			bufferTx[12] = 0;
-			bufferTx[13] = 0;  
-			bufferTx[14] = 0;  
-			bufferTx[15] = 0;
-			bufferTx[16] = 0;  
-			bufferTx[17] = 0;  
-			bufferTx[18] = 0;
+			bufferTx[3] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_funzionale[3];  
+			bufferTx[4] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_funzionale[2];  
+			bufferTx[5] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_funzionale[1];  
+			bufferTx[6] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_funzionale[0];  
+			bufferTx[7] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_autonomia[3];   
+			bufferTx[8] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_autonomia[2];  
+			bufferTx[9] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_autonomia[1];  
+			bufferTx[10] = 0; //((unsigned char*)&p_shmem_cenlin->timer_test_autonomia[0];  
+			bufferTx[11] = 0;  //((unsigned char*)&p_shmem_cenlin->period_test_funzionale[3];  
+			bufferTx[12] = 0;//((unsigned char*)&p_shmem_cenlin->period_test_funzionale[2];  
+			bufferTx[13] = 0;  //((unsigned char*)&p_shmem_cenlin->period_test_funzionale[1];  
+			bufferTx[14] = 0;  //((unsigned char*)&p_shmem_cenlin->period_test_funzionale[0];  
+			bufferTx[15] = 0;//((unsigned char*)&p_shmem_cenlin->period_test_autonomia[3];  
+			bufferTx[16] = 0;  //((unsigned char*)&p_shmem_cenlin->period_test_autonomia[2];  
+			bufferTx[17] = 0;  //((unsigned char*)&p_shmem_cenlin->period_test_autonomia[1];  
+			bufferTx[18] = 0;//((unsigned char*)&p_shmem_cenlin->period_test_autonomia[0];  
 			bufferTx[19]=calcCRC(bufferTx);//CRC 
 		break;
 
 		case OPCODE_SET_TIM_TEST_FUNZIONALE:
 			printf("RX IMPOSTA TIMER TEST FUNZIONALE\n"); //0x12
-			//TO DO devo passare i dati alla cenlin
-			//p_shmem_cenlin->new_message = 1;
-			//p_shmem_cenlin->message[0] = 0x01;
-			//p_shmem_cenlin->message[1] = 41;
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_TIM_TEST_FUNZIONALE;
+			p_shmem_cenlin->message[1] = byte[3];
+			p_shmem_cenlin->message[2] = byte[4];
+			p_shmem_cenlin->message[3] = byte[5];
+			p_shmem_cenlin->message[4] = byte[6];
 
 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
@@ -1438,10 +1443,13 @@ void gestOpcodeMain(int byte[]){
 
 		case OPCODE_SET_TIM_TEST_AUTONOMIA:
 			printf("RX IMPOSTA TIMER TEST AUTONOMIA\n"); //0x13
-			//TO DO devo passare i dati alla cenlin
-			//p_shmem_cenlin->new_message = 1;
-			//p_shmem_cenlin->message[0] = 0x01;
-			//p_shmem_cenlin->message[1] = 41;
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_TIM_TEST_AUTONOMIA;
+			p_shmem_cenlin->message[1] = byte[3];
+			p_shmem_cenlin->message[2] = byte[4];
+			p_shmem_cenlin->message[3] = byte[5];
+			p_shmem_cenlin->message[4] = byte[6];
 
 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
@@ -1452,10 +1460,13 @@ void gestOpcodeMain(int byte[]){
 
 		case OPCODE_SET_PERIOD_TEST_FUNZIONALE:
 			printf("RX IMPOSTA PERIODO TEST FUNZIONALE\n"); //0x14
-			//TO DO devo passare i dati alla cenlin
-			//p_shmem_cenlin->new_message = 1;
-			//p_shmem_cenlin->message[0] = 0x01;
-			//p_shmem_cenlin->message[1] = 41;
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_PERIOD_TEST_FUNZIONALE;
+			p_shmem_cenlin->message[1] = byte[3];
+			p_shmem_cenlin->message[2] = byte[4];
+			p_shmem_cenlin->message[3] = byte[5];
+			p_shmem_cenlin->message[4] = byte[6];
 
 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
@@ -1466,10 +1477,13 @@ void gestOpcodeMain(int byte[]){
 
 		case OPCODE_SET_PERIOD_TEST_AUTONOMIA:
 			printf("RX IMPOSTA PERIODO TEST AUTONOMIA\n"); //0x15
-			//TO DO devo passare i dati alla cenlin
-			//p_shmem_cenlin->new_message = 1;
-			//p_shmem_cenlin->message[0] = 0x01;
-			//p_shmem_cenlin->message[1] = 41;
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_PERIOD_TEST_AUTONOMIA;
+			p_shmem_cenlin->message[1] = byte[3];
+			p_shmem_cenlin->message[2] = byte[4];
+			p_shmem_cenlin->message[3] = byte[5];
+			p_shmem_cenlin->message[4] = byte[6];
 
 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
@@ -2104,7 +2118,7 @@ void print_json_status(void) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed=true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",,\"cu_desc\":\"Centrale piano terra\",\"update\":\"completed\"," );
     //if (p_shmem_cenlin->status_changed) {
 	sprintf(appo, "\"status\":\"");
 	strcat(json_string, appo);	

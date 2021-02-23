@@ -254,7 +254,7 @@ struct shmem_cenlin* p_shmem_cenlin;
 #define 	OPCODE_GET_TIM_TEST_E_PERIOD          	0x11
 #define 	OPCODE_SET_TIM_TEST_FUNZIONALE  		0x12
 #define 	OPCODE_SET_TIM_TEST_AUTONOMIA   		0x13
-#define 	OPCODE_SET_PERIOD_TEST_FUNZIONAL 		0x14
+#define 	OPCODE_SET_PERIOD_TEST_FUNZIONALE 		0x14
 #define 	OPCODE_SET_PERIOD_TEST_AUTONOMIA        0x15
 #define 	OPCODE_GET_CONT_LAST_EVENTI            	0x16
 #define 	OPCODE_RESET_CONT_LAST_EVENTI         	0x17
@@ -325,11 +325,14 @@ struct shmem_cenlin* p_shmem_cenlin;
 #define 	OPCODE_START_OTA_CUSTOM_BY_CLOUD    	0x71
 
 //Lista subcode di OPCODE_LG_CMD_PASS_THROUGH  
+#define 	SUBCODE_RICERCA_LAMPADE					0x01 
 #define 	SUBCODE_CICLO_POLL_COMPLETO				0x02 
 #define 	SUBCODE_TEST_FUNZIONALE			    	0x03
 #define 	SUBCODE_TEST_AUTONOMIA_1H			   	0x04
+#define 	SUBCODE_TEST_AUTONOMIA_DURATA_IMPOSTATA	0x05
 #define 	SUBCODE_ACCENSIONE_INCONDIZIONATA		0x06
 #define 	SUBCODE_STOP_TEST					   	0x07
+#define 	SUBCODE_COMANDO_SA					   	0x08
 #define 	SUBCODE_DISABILITA_EMERGENZA			0x09
 #define 	SUBCODE_ABILITA_EMERGENZA				0x0A
 #define 	SUBCODE_INIBIZIONE_IMPIANTO				0x0B
@@ -1364,7 +1367,7 @@ void gestOpcodeMain(int byte[]){
 
 		break;
 
-		case  OPCODE_SET_CONFIG_REG_CU            :
+		case  OPCODE_SET_CONFIG_REG_CU:
 			printf("RX SET_CONFIG_REG_CU\n");
 		break;
 
@@ -1390,6 +1393,89 @@ void gestOpcodeMain(int byte[]){
 
 		case OPCODE_GET_DATI_IMPIANTO:
 			printf("RX GET DATI IMPIANTO\n");
+		break;
+
+		
+		case OPCODE_GET_TIM_TEST_E_PERIOD:
+			printf("RX GET TIMER TEST E PERIOD\n"); //0x11
+
+			//preparo la risposta 
+			bufferTx[0]=0x14;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3] = 0;  
+			bufferTx[4] = 0;  
+			bufferTx[5] = 0;  
+			bufferTx[6] = 0;  
+			bufferTx[7] = 0;  
+			bufferTx[8] = 0;  
+			bufferTx[9] = 0; 
+			bufferTx[10] = 0;  
+			bufferTx[11] = 0;  
+			bufferTx[12] = 0;
+			bufferTx[13] = 0;  
+			bufferTx[14] = 0;  
+			bufferTx[15] = 0;
+			bufferTx[16] = 0;  
+			bufferTx[17] = 0;  
+			bufferTx[18] = 0;
+			bufferTx[19]=calcCRC(bufferTx);//CRC 
+		break;
+
+		case OPCODE_SET_TIM_TEST_FUNZIONALE:
+			printf("RX IMPOSTA TIMER TEST FUNZIONALE\n"); //0x12
+			//TO DO devo passare i dati alla cenlin
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = 0x01;
+			//p_shmem_cenlin->message[1] = 41;
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;
+
+		case OPCODE_SET_TIM_TEST_AUTONOMIA:
+			printf("RX IMPOSTA TIMER TEST AUTONOMIA\n"); //0x13
+			//TO DO devo passare i dati alla cenlin
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = 0x01;
+			//p_shmem_cenlin->message[1] = 41;
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;
+
+		case OPCODE_SET_PERIOD_TEST_FUNZIONALE:
+			printf("RX IMPOSTA PERIODO TEST FUNZIONALE\n"); //0x14
+			//TO DO devo passare i dati alla cenlin
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = 0x01;
+			//p_shmem_cenlin->message[1] = 41;
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;
+
+		case OPCODE_SET_PERIOD_TEST_AUTONOMIA:
+			printf("RX IMPOSTA PERIODO TEST AUTONOMIA\n"); //0x15
+			//TO DO devo passare i dati alla cenlin
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = 0x01;
+			//p_shmem_cenlin->message[1] = 41;
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
 		break;
 
 
@@ -1442,7 +1528,7 @@ void gestCmdPassThrough(int byte[]){
 			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
 			p_shmem_cenlin->message[1] = 41;
-            printf("ab");
+
 			//preparo la risposta 
 			bufferTx[0]=0x07;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode

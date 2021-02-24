@@ -2040,9 +2040,9 @@ void print_json_status(void) {
 	sprintf(appo, "%d", p_shmem_cenlin->statoCenlin.Timestamp);
 	strcat(json_string, appo);	
 
-	sprintf(appo, ",\"timeZone\":\"");
+	sprintf(appo, ",\"timeZone\":");
 	strcat(json_string, appo);	
-	sprintf(appo, "01\"");
+	sprintf(appo, "1");
 	strcat(json_string, appo);	
 
 	sprintf(appo, ",\"testRunning\":\"");

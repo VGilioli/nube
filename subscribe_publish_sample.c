@@ -136,7 +136,7 @@ struct shmem_cenlin {
 	u16 gTotNodi;
 	u8 power[992];
 	u8 new_message;
-	u8 message[10];
+	u8 message[100];
 	cenlinStatusStruct statoCenlin;
 
 };
@@ -254,7 +254,7 @@ struct shmem_cenlin* p_shmem_cenlin;
 #define 	OPCODE_GET_TIM_TEST_E_PERIOD          	0x11
 #define 	OPCODE_SET_TIM_TEST_FUNZIONALE  		0x12
 #define 	OPCODE_SET_TIM_TEST_AUTONOMIA   		0x13
-#define 	OPCODE_SET_PERIOD_TEST_FUNZIONAL 		0x14
+#define 	OPCODE_SET_PERIOD_TEST_FUNZIONALE 		0x14
 #define 	OPCODE_SET_PERIOD_TEST_AUTONOMIA        0x15
 #define 	OPCODE_GET_CONT_LAST_EVENTI            	0x16
 #define 	OPCODE_RESET_CONT_LAST_EVENTI         	0x17
@@ -325,11 +325,14 @@ struct shmem_cenlin* p_shmem_cenlin;
 #define 	OPCODE_START_OTA_CUSTOM_BY_CLOUD    	0x71
 
 //Lista subcode di OPCODE_LG_CMD_PASS_THROUGH  
+#define 	SUBCODE_RICERCA_LAMPADE					0x01 
 #define 	SUBCODE_CICLO_POLL_COMPLETO				0x02 
 #define 	SUBCODE_TEST_FUNZIONALE			    	0x03
 #define 	SUBCODE_TEST_AUTONOMIA_1H			   	0x04
+#define 	SUBCODE_TEST_AUTONOMIA_DURATA_IMPOSTATA	0x05
 #define 	SUBCODE_ACCENSIONE_INCONDIZIONATA		0x06
 #define 	SUBCODE_STOP_TEST					   	0x07
+#define 	SUBCODE_COMANDO_SA					   	0x08
 #define 	SUBCODE_DISABILITA_EMERGENZA			0x09
 #define 	SUBCODE_ABILITA_EMERGENZA				0x0A
 #define 	SUBCODE_INIBIZIONE_IMPIANTO				0x0B
@@ -1261,7 +1264,7 @@ void print_json_command(int msg[]) {
     int i = 0;
 	int j = 0;
 	char appo[MAX_LEN_SHADOW+1];
-	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
+	
 	sprintf(json_string, "{\"frame\":\"" );
 	
 	for (j=0; j < msg[0]; j++){
@@ -1364,7 +1367,7 @@ void gestOpcodeMain(int byte[]){
 
 		break;
 
-		case  OPCODE_SET_CONFIG_REG_CU            :
+		case  OPCODE_SET_CONFIG_REG_CU:
 			printf("RX SET_CONFIG_REG_CU\n");
 		break;
 
@@ -1372,11 +1375,13 @@ void gestOpcodeMain(int byte[]){
 			printf("RX GET MEASURE\n");
 			//devo leggere V e I sulla cenlin ???? 
 			//preparare la risposta 
-			bufferTx[0]=5;//numBytes 
+			bufferTx[0]=7;//numBytes 
 			bufferTx[1]=0;//ctrlCode
 			bufferTx[2]=OPCODE_GET_MEASURES; //ripeto l'opcode nella risposta
 			bufferTx[3]=0; //0=OK 1=KO e poi mando i dati in una shadow???? oppure devo mettere qui i dati????
-            bufferTx[4]=calcCRC(bufferTx); //CRC 
+			bufferTx[4]=0; //tensione batteria H
+			bufferTx[5]=0; //tensione batteria L
+            bufferTx[6]=calcCRC(bufferTx); //CRC 
 			//shadow ????
 		break;
 
@@ -1392,6 +1397,105 @@ void gestOpcodeMain(int byte[]){
 			printf("RX GET DATI IMPIANTO\n");
 		break;
 
+		
+		case OPCODE_GET_TIM_TEST_E_PERIOD:
+			printf("RX GET TIMER TEST E PERIOD\n"); //0x11
+
+			//preparo la risposta 
+			bufferTx[0]=0x14;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_funzionale[3];  
+			bufferTx[4] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_funzionale[2];  
+			bufferTx[5] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_funzionale[1];  
+			bufferTx[6] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_funzionale[0];  
+			bufferTx[7] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_autonomia[3];   
+			bufferTx[8] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_autonomia[2];  
+			bufferTx[9] = 0;  //((unsigned char*)&p_shmem_cenlin->timer_test_autonomia[1];  
+			bufferTx[10] = 0; //((unsigned char*)&p_shmem_cenlin->timer_test_autonomia[0];  
+			bufferTx[11] = 0;  //((unsigned char*)&p_shmem_cenlin->period_test_funzionale[3];  
+			bufferTx[12] = 0;//((unsigned char*)&p_shmem_cenlin->period_test_funzionale[2];  
+			bufferTx[13] = 0;  //((unsigned char*)&p_shmem_cenlin->period_test_funzionale[1];  
+			bufferTx[14] = 0;  //((unsigned char*)&p_shmem_cenlin->period_test_funzionale[0];  
+			bufferTx[15] = 0;//((unsigned char*)&p_shmem_cenlin->period_test_autonomia[3];  
+			bufferTx[16] = 0;  //((unsigned char*)&p_shmem_cenlin->period_test_autonomia[2];  
+			bufferTx[17] = 0;  //((unsigned char*)&p_shmem_cenlin->period_test_autonomia[1];  
+			bufferTx[18] = 0;//((unsigned char*)&p_shmem_cenlin->period_test_autonomia[0];  
+			bufferTx[19]=calcCRC(bufferTx);//CRC 
+		break;
+
+		case OPCODE_SET_TIM_TEST_FUNZIONALE:
+			printf("RX IMPOSTA TIMER TEST FUNZIONALE\n"); //0x12
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_TIM_TEST_FUNZIONALE;
+			p_shmem_cenlin->message[1] = byte[3];
+			p_shmem_cenlin->message[2] = byte[4];
+			p_shmem_cenlin->message[3] = byte[5];
+			p_shmem_cenlin->message[4] = byte[6];
+			p_shmem_cenlin->message[5] = byte[7];
+			p_shmem_cenlin->message[6] = byte[8];
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;
+
+		case OPCODE_SET_TIM_TEST_AUTONOMIA:
+			printf("RX IMPOSTA TIMER TEST AUTONOMIA\n"); //0x13
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_TIM_TEST_AUTONOMIA;
+			p_shmem_cenlin->message[1] = byte[3];
+			p_shmem_cenlin->message[2] = byte[4];
+			p_shmem_cenlin->message[3] = byte[5];
+			p_shmem_cenlin->message[4] = byte[6];
+			p_shmem_cenlin->message[5] = byte[7];
+			p_shmem_cenlin->message[6] = byte[8];
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;
+
+		case OPCODE_SET_PERIOD_TEST_FUNZIONALE:
+			printf("RX IMPOSTA PERIODO TEST FUNZIONALE\n"); //0x14
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_PERIOD_TEST_FUNZIONALE;
+			p_shmem_cenlin->message[1] = byte[3];
+			p_shmem_cenlin->message[2] = byte[4];
+			p_shmem_cenlin->message[3] = byte[5];
+			p_shmem_cenlin->message[4] = byte[6];
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;
+
+		case OPCODE_SET_PERIOD_TEST_AUTONOMIA:
+			printf("RX IMPOSTA PERIODO TEST AUTONOMIA\n"); //0x15
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_PERIOD_TEST_AUTONOMIA;
+			p_shmem_cenlin->message[1] = byte[3];
+			p_shmem_cenlin->message[2] = byte[4];
+			p_shmem_cenlin->message[3] = byte[5];
+			p_shmem_cenlin->message[4] = byte[6];
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;
+
 
 		case  OPCODE_LG_CMD_PASS_THROUGH: //0x40  
 		    //devo gestire i sotto opcode 
@@ -1402,6 +1506,38 @@ void gestOpcodeMain(int byte[]){
 		case OPCODE_SET_STATUS_MOD_WIFI:
 			printf("RX OPCODE_SET_STATUS_MOD_WIFI\n");
 		break;
+
+		case OPCODE_SET_NOME_IMPIANTO:
+			printf("RX OPCODE_SET NOME IMPIANTO\n");
+
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_NOME_IMPIANTO;
+			for (int i=3;i<byte[0]-1;i++)
+				p_shmem_cenlin->message[i-2] = byte[i];
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;
+
+		/*case OPCODE_GET_NOME_IMPIANTO:
+			printf("RX OPCODE_GET NOME IMPIANTO\n");
+
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = OPCODE_SET_NOME_IMPIANTO;
+			for (i=3;i<byte[0]-1;i++)
+				p_shmem_cenlin->message[i-2] = byte[i];
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+		break;*/
 
 		default: //subcode non previsto 
 			//preparo la risposta 
@@ -1456,7 +1592,7 @@ void gestCmdPassThrough(int byte[]){
 		case  SUBCODE_TEST_AUTONOMIA_1H: //0x04 test autonomia + 2 byte address destinatario H-L (0xFFFF = broadcast)
 			printf("TEST Autonomia 1H\n");
 			
-			//TO DO devo chiedere l'esecuzione del test autonomia...
+			//devo chiedere l'esecuzione del test autonomia...
 			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
 			p_shmem_cenlin->message[1] = 42;
@@ -2018,7 +2154,7 @@ void print_json_status(void) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed=true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",,\"cu_desc\":\"Centrale piano terra\",\"update\":\"completed\"," );
     //if (p_shmem_cenlin->status_changed) {
 	sprintf(appo, "\"status\":\"");
 	strcat(json_string, appo);	

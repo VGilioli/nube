@@ -1333,38 +1333,39 @@ void gestOpcodeMain(int byte[]){
 
 		case  OPCODE_GET_SW_INFO_CU:
 			printf("RX GET SW INFO CU\n");
+			//preparare la risposta 
+			bufferTx[0] = 13;//numBytes 
+			bufferTx[1] = 0;//ctrlCode
+			bufferTx[2] = OPCODE_GET_SW_INFO_CU; //ripeto l'opcode nella risposta
+			bufferTx[3] = 0;  //SW_VERSION_BYTE_HI            
+			bufferTx[4] = 0;  //SW_VERSION_BYTE_LOW           
+			bufferTx[5] = 0;  //SW_BUILD_BYTE_HI              
+			bufferTx[6] = 0;  //SW_BUILD_BYTE_LOW             
+			bufferTx[7] = 0;  //TIPO_DISPOSITIVO              
+			bufferTx[8] = 0;  //BOOTLOADER_VER                
+			bufferTx[9] = 0;  //FW_ATTUALE                    
+			bufferTx[10] = 0; //SW_NOTACTIVE_BUILD_BYTE_HI    
+			bufferTx[11] = 0; //SW_NOTACTIVE_BUILD_BYTE_LOW 
+            bufferTx[12] = calcCRC(bufferTx); //CRC 
 		break;
 
 		case  OPCODE_GET_STATUS_ALARM_CU:
-			// byte0: TIPO_DISPOSITIVO
-			// byte1: uStatusDispositivo.lByte.Low;
-			// byte2: uStatusDispositivo.lByte.MediumL;
-			// byte3: uSettingsReg.cReg;
-			// byte4: uErrori.iByte.Low;
-			// byte5: uErrori.iByte.High;
-			// byte6: uStatusModuloWiFi.cReg;
-			// byte7: uStatusDispositivo.lByte.MediumH;
-			// byte8: uStatusDispositivo.lByte.High;
 			printf("RX GET_STATUS_ALARM_CU\n");
-			p_shmem_cenlin->status_changed = 1;
-			p_shmem_cenlin->errors_changed = 1;
-			p_shmem_cenlin->power_changed = 1;
-						//preparare la risposta 
+			
+			//preparare la risposta 
 			bufferTx[0] = 13;//numBytes 
 			bufferTx[1] = 0;//ctrlCode
 			bufferTx[2] = OPCODE_GET_STATUS_ALARM_CU; //ripeto l'opcode nella risposta
-			bufferTx[3] = 0;  
-			bufferTx[4] = 0;  
-			bufferTx[5] = 0;  
-			bufferTx[6] = 0;  
-			bufferTx[7] = 0;  
-			bufferTx[8] = 0;  
-			bufferTx[9] = 0; 
-			bufferTx[10] = 0;  
-			bufferTx[11] = 0;  
+			bufferTx[3] = 0;  // byte0: TIPO_DISPOSITIVO
+			bufferTx[4] = 0;  // byte1: uStatusDispositivo.lByte.Low;
+			bufferTx[5] = 0;  // byte2: uStatusDispositivo.lByte.MediumL;
+			bufferTx[6] = 0;  // byte3: uSettingsReg.cReg;
+			bufferTx[7] = 0;  // byte4: uErrori.iByte.Low;
+			bufferTx[8] = 0;  // byte5: uErrori.iByte.High;
+			bufferTx[9] = 0;  // byte6: uStatusModuloWiFi.cReg;
+			bufferTx[10] = 0; // byte7: uStatusDispositivo.lByte.MediumH;
+			bufferTx[11] = 0; // byte8: uStatusDispositivo.lByte.High;
             bufferTx[12] = calcCRC(bufferTx); //CRC 
-
-
 		break;
 
 		case  OPCODE_SET_CONFIG_REG_CU:
@@ -1385,8 +1386,25 @@ void gestOpcodeMain(int byte[]){
 			//shadow ????
 		break;
 
-		case OPCODE_SET_DATA_ORA:
+		case OPCODE_SET_DATA_ORA: //0x0E
 			printf("RX SET DATA ORA\n");
+			//TO DO devo passare i dati alla cenlin
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = OPCODE_SET_DATA_ORA;
+			//p_shmem_cenlin->message[1] = byte[3]; //Anno
+			//p_shmem_cenlin->message[2] = byte[4]; //Mese
+			//p_shmem_cenlin->message[3] = byte[5]; //Giorno
+			//p_shmem_cenlin->message[4] = byte[6]; //Giorno della settimana [1=lun .. 7=dom]
+			//p_shmem_cenlin->message[5] = byte[7]; //Ore
+			//p_shmem_cenlin->message[6] = byte[8]; //Minuti
+			//p_shmem_cenlin->message[7] = byte[9]; //Secondi
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+
 		break;
 
 		case OPCODE_GET_DATA_ORA:

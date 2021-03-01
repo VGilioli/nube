@@ -136,7 +136,7 @@ struct shmem_cenlin {
 	u16 gTotNodi;
 	u8 power[992];
 	u8 new_message;
-	u8 message[100];
+	u8 message[200];
 	cenlinStatusStruct statoCenlin;
 
 };
@@ -1711,7 +1711,7 @@ void gestCmdPassThrough(int byte[]){
 			//devo passare i dati alla cenlin
 			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
-			p_shmem_cenlin->message[1] = 0x12;
+			p_shmem_cenlin->message[1] = 44;//0x12;
 
 			for (int i=4;i<byte[0]-1;i++)
 				p_shmem_cenlin->message[i-2] = byte[i];

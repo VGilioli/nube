@@ -338,7 +338,10 @@ struct shmem_cenlin* p_shmem_cenlin;
 #define 	SUBCODE_INIBIZIONE_IMPIANTO				0x0B
 #define		SUBCODE_CANCELLA_ERRORI					0x0C
 #define		SUBCODE_BLINK_LAMPADA_ON_OFF			0x0D
-
+#define		SUBCODE_SCRIVI_TIPO_PRODOTTO			0x0E
+#define		SUBCODE_TEST_COMUNICAZIONE				0x0F
+#define		SUBCODE_SET_CONFIG_LAMP					0x11
+#define		SUBCODE_SET_CONFIG_LAMP_MULTI			0x12
 
 
 typedef enum {
@@ -1331,7 +1334,7 @@ void gestOpcodeMain(int byte[]){
     //int byteTx[20];
 	switch(byte[2]){
 
-		case  OPCODE_GET_SW_INFO_CU:
+		case  OPCODE_GET_SW_INFO_CU: //0x01
 			printf("RX GET SW INFO CU\n");
 			//preparare la risposta 
 			bufferTx[0] = 13;//numBytes 
@@ -1349,7 +1352,7 @@ void gestOpcodeMain(int byte[]){
             bufferTx[12] = calcCRC(bufferTx); //CRC 
 		break;
 
-		case  OPCODE_GET_STATUS_ALARM_CU:
+		case  OPCODE_GET_STATUS_ALARM_CU: //0x02
 			printf("RX GET_STATUS_ALARM_CU\n");
 			
 			//preparare la risposta 
@@ -1372,7 +1375,7 @@ void gestOpcodeMain(int byte[]){
 			printf("RX SET_CONFIG_REG_CU\n");
 		break;
 
-		case  OPCODE_GET_MEASURES: // Risposta: 2 byte Tensione batteria CU (H-L)
+		case  OPCODE_GET_MEASURES: // 0x04 Risposta: 2 byte Tensione batteria CU (H-L)
 			printf("RX GET MEASURE\n");
 			//devo leggere V e I sulla cenlin ???? 
 			//preparare la risposta 
@@ -1407,11 +1410,11 @@ void gestOpcodeMain(int byte[]){
 
 		break;
 
-		case OPCODE_GET_DATA_ORA:
+		case OPCODE_GET_DATA_ORA: //0x0F
 			printf("RX GET DATA ORA\n");
 		break;
 
-		case OPCODE_GET_DATI_IMPIANTO:
+		case OPCODE_GET_DATI_IMPIANTO: //0x10
 			printf("RX GET DATI IMPIANTO\n");
 		break;
 
@@ -1465,8 +1468,10 @@ void gestOpcodeMain(int byte[]){
 			printf("RX IMPOSTA TIMER TEST AUTONOMIA\n"); //0x13
 			//devo passare i dati alla cenlin
 			p_shmem_cenlin->new_message = 1;
-			p_shmem_cenlin->message[0] = OPCODE_SET_TIM_TEST_AUTONOMIA;
-			p_shmem_cenlin->message[1] = byte[3];
+			p_shmem_cenlin->message[0] = OPCODE_SET_TIM_TEST_AUTONOMIA; 
+			//cambiato il protocollo rispetto alle impostazioni di modestino: non passo i secondi in 4 byte ma
+			//ora minuto secondi giorno mese anno N.B. l'ordine potrebbe non essere quello indicato. 
+			p_shmem_cenlin->message[1] = byte[3]; 
 			p_shmem_cenlin->message[2] = byte[4];
 			p_shmem_cenlin->message[3] = byte[5];
 			p_shmem_cenlin->message[4] = byte[6];
@@ -1497,7 +1502,7 @@ void gestOpcodeMain(int byte[]){
 			bufferTx[3]=calcCRC(bufferTx);//CRC 
 		break;
 
-		case OPCODE_SET_PERIOD_TEST_AUTONOMIA:
+		case OPCODE_SET_PERIOD_TEST_AUTONOMIA: //0x15
 			printf("RX IMPOSTA PERIODO TEST AUTONOMIA\n"); //0x15
 			//devo passare i dati alla cenlin
 			p_shmem_cenlin->new_message = 1;
@@ -1521,11 +1526,15 @@ void gestOpcodeMain(int byte[]){
 			gestCmdPassThrough(byte);
 		break;
 
+		case OPCODE_STOP_TEST_COMUNICAZIONE: //0x41
+			printf("RX OPCODE_STOP_TEST_COMUNICAZIONE\n");
+		break;
+
 		case OPCODE_SET_STATUS_MOD_WIFI:
 			printf("RX OPCODE_SET_STATUS_MOD_WIFI\n");
 		break;
 
-		case OPCODE_SET_NOME_IMPIANTO:
+		case OPCODE_SET_NOME_IMPIANTO: //0x70
 			printf("RX OPCODE_SET NOME IMPIANTO\n");
 
 			//devo passare i dati alla cenlin
@@ -1541,7 +1550,7 @@ void gestOpcodeMain(int byte[]){
 			bufferTx[3]=calcCRC(bufferTx);//CRC 
 		break;
 
-		/*case OPCODE_GET_NOME_IMPIANTO:
+		/*case OPCODE_GET_NOME_IMPIANTO: //0x71
 			printf("RX OPCODE_GET NOME IMPIANTO\n");
 
 			//devo passare i dati alla cenlin
@@ -1564,8 +1573,6 @@ void gestOpcodeMain(int byte[]){
  			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
 			bufferTx[3]=calcCRC(bufferTx);//CRC 
 		break;
-
-
 	}
 }
 
@@ -1693,6 +1700,28 @@ void gestCmdPassThrough(int byte[]){
 			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
 			bufferTx[3]=SUBCODE_INIBIZIONE_IMPIANTO; //subcode 0x0B
             bufferTx[4]=0xFF; 
+			bufferTx[5]=0xFF;
+			bufferTx[6]=calcCRC(bufferTx);//CRC 
+		break;
+
+		
+
+		case SUBCODE_SET_CONFIG_LAMP_MULTI: //0x12
+		
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = 0x01;
+			p_shmem_cenlin->message[1] = 0x12;
+
+			for (int i=4;i<byte[0]-1;i++)
+				p_shmem_cenlin->message[i-2] = byte[i];
+
+		    //preparo la risposta 
+			bufferTx[0]=0x05;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode
+			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
+			bufferTx[3]=SUBCODE_SET_CONFIG_LAMP_MULTI; //subcode 0x12
+			bufferTx[4]=0xFF; 
 			bufferTx[5]=0xFF;
 			bufferTx[6]=calcCRC(bufferTx);//CRC 
 		break;

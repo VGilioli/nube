@@ -1285,7 +1285,7 @@ void print_json_command(int msg[]) {
 }
 
 
-void convertStringToByte(char* st, int byte[]){
+void convertStringToByte(char* st, int byte[]) {
     
     int i;
     char stTemp[2];
@@ -1329,7 +1329,7 @@ unsigned char calcCRC(int byte[]){
 void gestOpcodeMain(int byte[]){
     
     //int byteTx[20];
-	switch(byte[2]){
+	switch(byte[2]) {
 
 		case  OPCODE_GET_SW_INFO_CU:
 			printf("RX GET SW INFO CU\n");
@@ -1363,7 +1363,6 @@ void gestOpcodeMain(int byte[]){
 			bufferTx[10] = 0;  
 			bufferTx[11] = 0;  
             bufferTx[12] = calcCRC(bufferTx); //CRC 
-
 
 		break;
 
@@ -2154,7 +2153,7 @@ void print_json_status(void) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed=true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",,\"cu_desc\":\"Centrale piano terra\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"cu_desc\":\"Centrale piano terra\",\"update\":\"completed\"," );
     //if (p_shmem_cenlin->status_changed) {
 	sprintf(appo, "\"status\":\"");
 	strcat(json_string, appo);	
@@ -2174,11 +2173,6 @@ void print_json_status(void) {
 	sprintf(appo, ",\"timestamp\":");
 	strcat(json_string, appo);	
 	sprintf(appo, "%d", p_shmem_cenlin->statoCenlin.Timestamp);
-	strcat(json_string, appo);	
-
-	sprintf(appo, ",\"timeZone\":");
-	strcat(json_string, appo);	
-	sprintf(appo, "1");
 	strcat(json_string, appo);	
 
 	sprintf(appo, ",\"testRunning\":\"");
@@ -2356,6 +2350,12 @@ int main(int argc, char **argv) {
 	time_t t;
 	struct tm time_now; 
 	u32 cnt_cicle=0;
+	u32 Etichetta;
+
+    //	Load etichetta CenLin
+    Etichetta = ReadEtichettaCentrale ();
+    printf("Etichetta is %s \n", Etichetta);
+
 
 	printf("create thread \n");
 	res = pthread_create(&id_thread0, NULL, thread_shmem, NULL);
@@ -2433,7 +2433,7 @@ int main(int argc, char **argv) {
 	}
 
 	IOT_INFO("Subscribing...");
-	rc = aws_iot_mqtt_subscribe(&client, "logicafm_99998/command", 22, QOS0, iot_subscribe_callback_handler, NULL);
+	rc = aws_iot_mqtt_subscribe(&client, "logicafm_99998/command_fm", 25, QOS0, iot_subscribe_callback_handler, NULL);
 	if(SUCCESS != rc) {
 		IOT_ERROR("Error subscribing : %d ", rc);
 		return rc;

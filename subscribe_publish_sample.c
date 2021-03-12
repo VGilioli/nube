@@ -51,8 +51,7 @@
 #include "Ram.h"
 
 //pp
-
-
+u32 Etichetta;
 u8      BufferUpdate[512*1024];
 //      Tipo di centrale FM oppure SD
 u8      TipoCentrale;
@@ -136,7 +135,7 @@ struct shmem_cenlin {
 	u16 gTotNodi;
 	u8 power[992];
 	u8 new_message;
-	u8 message[100];
+	u8 message[200];
 	cenlinStatusStruct statoCenlin;
 
 };
@@ -338,7 +337,10 @@ struct shmem_cenlin* p_shmem_cenlin;
 #define 	SUBCODE_INIBIZIONE_IMPIANTO				0x0B
 #define		SUBCODE_CANCELLA_ERRORI					0x0C
 #define		SUBCODE_BLINK_LAMPADA_ON_OFF			0x0D
-
+#define		SUBCODE_SCRIVI_TIPO_PRODOTTO			0x0E
+#define		SUBCODE_TEST_COMUNICAZIONE				0x0F
+#define		SUBCODE_SET_CONFIG_LAMP					0x11
+#define		SUBCODE_SET_CONFIG_LAMP_MULTI			0x12
 
 
 typedef enum {
@@ -1197,7 +1199,7 @@ static bool flag_tx_json_command = false;
 
 static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, uint16_t topicNameLen,
 									IoT_Publish_Message_Params *params, void *pData) {
-	char value[256];    
+	char value[1024];    
 	char name[50];    
 	IOT_UNUSED(pData);
 	IOT_UNUSED(pClient);
@@ -1275,7 +1277,7 @@ void print_json_command(int msg[]) {
 	strcat(json_string, appo);	
 
     //aggiungo "cu_id":"99998","cu_type":"logicafm"
-	sprintf(appo, "\"cu_id\":\"99998\",\"cu_type\":\"logicafm\"");
+	sprintf(appo, "\"cu_id\":\"%5d\",\"cu_type\":\"logicafm\"", Etichetta);
 	strcat(json_string, appo);	
 
 
@@ -1331,46 +1333,48 @@ void gestOpcodeMain(int byte[]){
     //int byteTx[20];
 	switch(byte[2]) {
 
-		case  OPCODE_GET_SW_INFO_CU:
+		case  OPCODE_GET_SW_INFO_CU: //0x01
 			printf("RX GET SW INFO CU\n");
+			//preparare la risposta 
+			bufferTx[0] = 13;//numBytes 
+			bufferTx[1] = 0;//ctrlCode
+			bufferTx[2] = OPCODE_GET_SW_INFO_CU; //ripeto l'opcode nella risposta
+			bufferTx[3] = 0;  //SW_VERSION_BYTE_HI            
+			bufferTx[4] = 0;  //SW_VERSION_BYTE_LOW           
+			bufferTx[5] = 0;  //SW_BUILD_BYTE_HI              
+			bufferTx[6] = 0;  //SW_BUILD_BYTE_LOW             
+			bufferTx[7] = 0;  //TIPO_DISPOSITIVO              
+			bufferTx[8] = 0;  //BOOTLOADER_VER                
+			bufferTx[9] = 0;  //FW_ATTUALE                    
+			bufferTx[10] = 0; //SW_NOTACTIVE_BUILD_BYTE_HI    
+			bufferTx[11] = 0; //SW_NOTACTIVE_BUILD_BYTE_LOW 
+            bufferTx[12] = calcCRC(bufferTx); //CRC 
 		break;
 
-		case  OPCODE_GET_STATUS_ALARM_CU:
-			// byte0: TIPO_DISPOSITIVO
-			// byte1: uStatusDispositivo.lByte.Low;
-			// byte2: uStatusDispositivo.lByte.MediumL;
-			// byte3: uSettingsReg.cReg;
-			// byte4: uErrori.iByte.Low;
-			// byte5: uErrori.iByte.High;
-			// byte6: uStatusModuloWiFi.cReg;
-			// byte7: uStatusDispositivo.lByte.MediumH;
-			// byte8: uStatusDispositivo.lByte.High;
+		case  OPCODE_GET_STATUS_ALARM_CU: //0x02
 			printf("RX GET_STATUS_ALARM_CU\n");
-			p_shmem_cenlin->status_changed = 1;
-			p_shmem_cenlin->errors_changed = 1;
-			p_shmem_cenlin->power_changed = 1;
-						//preparare la risposta 
+			
+			//preparare la risposta 
 			bufferTx[0] = 13;//numBytes 
 			bufferTx[1] = 0;//ctrlCode
 			bufferTx[2] = OPCODE_GET_STATUS_ALARM_CU; //ripeto l'opcode nella risposta
-			bufferTx[3] = 0;  
-			bufferTx[4] = 0;  
-			bufferTx[5] = 0;  
-			bufferTx[6] = 0;  
-			bufferTx[7] = 0;  
-			bufferTx[8] = 0;  
-			bufferTx[9] = 0; 
-			bufferTx[10] = 0;  
-			bufferTx[11] = 0;  
+			bufferTx[3] = 0;  // byte0: TIPO_DISPOSITIVO
+			bufferTx[4] = 0;  // byte1: uStatusDispositivo.lByte.Low;
+			bufferTx[5] = 0;  // byte2: uStatusDispositivo.lByte.MediumL;
+			bufferTx[6] = 0;  // byte3: uSettingsReg.cReg;
+			bufferTx[7] = 0;  // byte4: uErrori.iByte.Low;
+			bufferTx[8] = 0;  // byte5: uErrori.iByte.High;
+			bufferTx[9] = 0;  // byte6: uStatusModuloWiFi.cReg;
+			bufferTx[10] = 0; // byte7: uStatusDispositivo.lByte.MediumH;
+			bufferTx[11] = 0; // byte8: uStatusDispositivo.lByte.High;
             bufferTx[12] = calcCRC(bufferTx); //CRC 
-
 		break;
 
 		case  OPCODE_SET_CONFIG_REG_CU:
 			printf("RX SET_CONFIG_REG_CU\n");
 		break;
 
-		case  OPCODE_GET_MEASURES: // Risposta: 2 byte Tensione batteria CU (H-L)
+		case  OPCODE_GET_MEASURES: // 0x04 Risposta: 2 byte Tensione batteria CU (H-L)
 			printf("RX GET MEASURE\n");
 			//devo leggere V e I sulla cenlin ???? 
 			//preparare la risposta 
@@ -1384,15 +1388,32 @@ void gestOpcodeMain(int byte[]){
 			//shadow ????
 		break;
 
-		case OPCODE_SET_DATA_ORA:
+		case OPCODE_SET_DATA_ORA: //0x0E
 			printf("RX SET DATA ORA\n");
+			//TO DO devo passare i dati alla cenlin
+			//p_shmem_cenlin->new_message = 1;
+			//p_shmem_cenlin->message[0] = OPCODE_SET_DATA_ORA;
+			//p_shmem_cenlin->message[1] = byte[3]; //Anno
+			//p_shmem_cenlin->message[2] = byte[4]; //Mese
+			//p_shmem_cenlin->message[3] = byte[5]; //Giorno
+			//p_shmem_cenlin->message[4] = byte[6]; //Giorno della settimana [1=lun .. 7=dom]
+			//p_shmem_cenlin->message[5] = byte[7]; //Ore
+			//p_shmem_cenlin->message[6] = byte[8]; //Minuti
+			//p_shmem_cenlin->message[7] = byte[9]; //Secondi
+
+			//preparo la risposta 
+			bufferTx[0]=0x04;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode 
+ 			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			bufferTx[3]=calcCRC(bufferTx);//CRC 
+
 		break;
 
-		case OPCODE_GET_DATA_ORA:
+		case OPCODE_GET_DATA_ORA: //0x0F
 			printf("RX GET DATA ORA\n");
 		break;
 
-		case OPCODE_GET_DATI_IMPIANTO:
+		case OPCODE_GET_DATI_IMPIANTO: //0x10
 			printf("RX GET DATI IMPIANTO\n");
 		break;
 
@@ -1446,8 +1467,10 @@ void gestOpcodeMain(int byte[]){
 			printf("RX IMPOSTA TIMER TEST AUTONOMIA\n"); //0x13
 			//devo passare i dati alla cenlin
 			p_shmem_cenlin->new_message = 1;
-			p_shmem_cenlin->message[0] = OPCODE_SET_TIM_TEST_AUTONOMIA;
-			p_shmem_cenlin->message[1] = byte[3];
+			p_shmem_cenlin->message[0] = OPCODE_SET_TIM_TEST_AUTONOMIA; 
+			//cambiato il protocollo rispetto alle impostazioni di modestino: non passo i secondi in 4 byte ma
+			//ora minuto secondi giorno mese anno N.B. l'ordine potrebbe non essere quello indicato. 
+			p_shmem_cenlin->message[1] = byte[3]; 
 			p_shmem_cenlin->message[2] = byte[4];
 			p_shmem_cenlin->message[3] = byte[5];
 			p_shmem_cenlin->message[4] = byte[6];
@@ -1478,7 +1501,7 @@ void gestOpcodeMain(int byte[]){
 			bufferTx[3]=calcCRC(bufferTx);//CRC 
 		break;
 
-		case OPCODE_SET_PERIOD_TEST_AUTONOMIA:
+		case OPCODE_SET_PERIOD_TEST_AUTONOMIA: //0x15
 			printf("RX IMPOSTA PERIODO TEST AUTONOMIA\n"); //0x15
 			//devo passare i dati alla cenlin
 			p_shmem_cenlin->new_message = 1;
@@ -1502,11 +1525,15 @@ void gestOpcodeMain(int byte[]){
 			gestCmdPassThrough(byte);
 		break;
 
+		case OPCODE_STOP_TEST_COMUNICAZIONE: //0x41
+			printf("RX OPCODE_STOP_TEST_COMUNICAZIONE\n");
+		break;
+
 		case OPCODE_SET_STATUS_MOD_WIFI:
 			printf("RX OPCODE_SET_STATUS_MOD_WIFI\n");
 		break;
 
-		case OPCODE_SET_NOME_IMPIANTO:
+		case OPCODE_SET_NOME_IMPIANTO: //0x70
 			printf("RX OPCODE_SET NOME IMPIANTO\n");
 
 			//devo passare i dati alla cenlin
@@ -1522,7 +1549,7 @@ void gestOpcodeMain(int byte[]){
 			bufferTx[3]=calcCRC(bufferTx);//CRC 
 		break;
 
-		/*case OPCODE_GET_NOME_IMPIANTO:
+		/*case OPCODE_GET_NOME_IMPIANTO: //0x71
 			printf("RX OPCODE_GET NOME IMPIANTO\n");
 
 			//devo passare i dati alla cenlin
@@ -1545,8 +1572,6 @@ void gestOpcodeMain(int byte[]){
  			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
 			bufferTx[3]=calcCRC(bufferTx);//CRC 
 		break;
-
-
 	}
 }
 
@@ -1674,6 +1699,28 @@ void gestCmdPassThrough(int byte[]){
 			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
 			bufferTx[3]=SUBCODE_INIBIZIONE_IMPIANTO; //subcode 0x0B
             bufferTx[4]=0xFF; 
+			bufferTx[5]=0xFF;
+			bufferTx[6]=calcCRC(bufferTx);//CRC 
+		break;
+
+		
+
+		case SUBCODE_SET_CONFIG_LAMP_MULTI: //0x12
+		
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			p_shmem_cenlin->message[0] = 0x40;
+			p_shmem_cenlin->message[1] = 0x12;
+
+			for (int i=4;i<byte[0]-1;i++)
+				p_shmem_cenlin->message[i-2] = byte[i];
+
+		    //preparo la risposta 
+			bufferTx[0]=0x05;//numBytes 
+			bufferTx[1]=0x00;//ctrlCode
+			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
+			bufferTx[3]=SUBCODE_SET_CONFIG_LAMP_MULTI; //subcode 0x12
+			bufferTx[4]=0xFF; 
 			bufferTx[5]=0xFF;
 			bufferTx[6]=calcCRC(bufferTx);//CRC 
 		break;
@@ -1836,6 +1883,9 @@ u32 ReadEtichettaCentrale (void) {
     ssize_t nRead;
     int     i;
 
+	//per il momento devo ritornare 99998
+	return 99998;
+
     fp = open("/etc/hostname", O_RDONLY);
     if (fp > 0) {
         memset (AuxBuf, 0, sizeof(AuxBuf));
@@ -1955,7 +2005,7 @@ void create_json_shadow_0() {
 	char str_appo[100] = {};
 	int i=0;
 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\",\"num_lamp_found\":%d,\"etichetta\":%d,\"codice_impianto\":%d,\"radio_id\":%d,\"flags\":\"%02x%02x%02x%02x%02x%02x%02x%02x\",\"err_12h\":\"%08X\",\"err_24h\":\"%08X\",\"lamp\":[",gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"num_lamp_found\":%d,\"etichetta\":%d,\"codice_impianto\":%d,\"radio_id\":%d,\"flags\":\"%02x%02x%02x%02x%02x%02x%02x%02x\",\"err_12h\":\"%08X\",\"err_24h\":\"%08X\",\"lamp\":[", Etichetta, gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
 
 	for (i=0 ; i<50 ; i++) {
 		if (i == (50-1))
@@ -1975,7 +2025,7 @@ void create_json_shadow_lum(int j) {
 	char str_appo[100] = {};
 	int i=0;
 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\",\"lamp\":[",gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"lamp\":[", Etichetta, gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
 
 	for (i=50*j ; i<((50+50*j)-1) ; i++) {
 		if (i == ((50+50*j)-1))
@@ -2027,7 +2077,7 @@ void print_json(char *buffer, unsigned int which_shadow) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed=true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",", Etichetta );
     for (j=0; j < NUM_BLOCK; j++) {
 		//cerco il bit which_shadow*NUM_BLOCK+j
 		//if((changed[((which_shadow*NUM_BLOCK)+j)/8]^(1<<(j%8))) == 0) {
@@ -2066,7 +2116,7 @@ void print_json_energy_and_time(u8 quale_shadow) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed = true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",", Etichetta);
     strcat(json_string, appo);	
 	//printf("appo is %s json is %s", appo, json_string);
 		//il primo blocco non ha la virgola davanti. 
@@ -2131,7 +2181,7 @@ void print_json_cuconfig(void) {
 	int j = 0;
 	char appo[MAX_LEN_SHADOW+1];
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\",\"blocks_modified\":\"" );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"blocks_modified\":\"", Etichetta );
 	
 	for (j=0; j < (NUM_BLOCK*LEN_BLOCK/8); j++){
 		sprintf(appo, "%02X", changed[j]);
@@ -2153,7 +2203,7 @@ void print_json_status(void) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed=true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"cu_desc\":\"Centrale piano terra\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"cu_desc\":\"Centrale piano terra\",\"update\":\"completed\",", Etichetta );
     //if (p_shmem_cenlin->status_changed) {
 	sprintf(appo, "\"status\":\"");
 	strcat(json_string, appo);	
@@ -2240,7 +2290,7 @@ void print_json_errors(void) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed=true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",", Etichetta );
     
     //if (p_shmem_cenlin->errors_changed) {
 	sprintf(appo, "\"errors\":\"");
@@ -2350,11 +2400,10 @@ int main(int argc, char **argv) {
 	time_t t;
 	struct tm time_now; 
 	u32 cnt_cicle=0;
-	u32 Etichetta;
-
+	char appo_str[30];
     //	Load etichetta CenLin
     Etichetta = ReadEtichettaCentrale ();
-    printf("Etichetta is %s \n", Etichetta);
+    printf("Etichetta is %d \n", Etichetta);
 
 
 	printf("create thread \n");
@@ -2433,7 +2482,8 @@ int main(int argc, char **argv) {
 	}
 
 	IOT_INFO("Subscribing...");
-	rc = aws_iot_mqtt_subscribe(&client, "logicafm_99998/command_fm", 25, QOS0, iot_subscribe_callback_handler, NULL);
+	sprintf(appo_str, "logicafm_%5d/command_fm", Etichetta);
+	rc = aws_iot_mqtt_subscribe(&client, appo_str, 25, QOS0, iot_subscribe_callback_handler, NULL);
 	if(SUCCESS != rc) {
 		IOT_ERROR("Error subscribing : %d ", rc);
 		return rc;
@@ -2456,7 +2506,7 @@ int main(int argc, char **argv) {
 	paramsQOS1.payload = (void *) cPayload;
 	paramsQOS1.isRetained = 0;
 
-	if(publishCount != 0) {
+	if (publishCount != 0) {
 		infinitePublishFlag = false;
 	}
 	
@@ -2516,7 +2566,7 @@ int main(int argc, char **argv) {
 					printf("Send shadow %d (len %d )  %s \n", i, strlen(json_string), json_string);
 					//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 					paramsQOS0.payloadLen = strlen(cPayload);
-					sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/param%02d/update", i);
+					sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/param%02d/update", Etichetta, i);
 					//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 					rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 					printf("Publish returned : %d \n", rc);
@@ -2532,7 +2582,7 @@ int main(int argc, char **argv) {
 			//printf("Send shadow status (len %d )  \n", strlen(json_string));//, json_string);
 			printf("Send shadow status : %s  \n", cPayload);
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/status/update");
+			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/status/update", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);
@@ -2548,7 +2598,7 @@ int main(int argc, char **argv) {
 			//printf("Send shadow status (len %d )  \n", strlen(json_string));//, json_string);
 			printf("Send shadow status : %s  \n", cPayload);
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/errors/update");
+			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/errors/update", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);
@@ -2565,7 +2615,7 @@ int main(int argc, char **argv) {
 			//printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(json_string));//, json_string);
 			printf("Send shadow command (len %d )  \n", strlen(cPayload));
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "logicafm_99998/response");
+			sprintf(str_topic_shadow, "logicafm_%5d/response", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);
@@ -2585,7 +2635,7 @@ int main(int argc, char **argv) {
 			printf("Send shadow %d (len %d )  -%s- \n", i, strlen(json_string), json_string);
 			//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/energy_time_00/update", i);
+			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_00/update", Etichetta, i);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);
@@ -2596,7 +2646,7 @@ int main(int argc, char **argv) {
 				printf("Send shadow %d (len %d )  %s \n", i, strlen(json_string), json_string);
 				//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 				paramsQOS0.payloadLen = strlen(cPayload);
-				sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/energy_time_01/update", i);
+				sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_01/update", Etichetta);
 				//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 				rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 				printf("Publish returned : %d \n", rc);
@@ -2608,7 +2658,7 @@ int main(int argc, char **argv) {
 				printf("Send shadow %d (len %d )  %s \n", i, strlen(json_string), json_string);
 				//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 				paramsQOS0.payloadLen = strlen(cPayload);
-				sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/energy_time_02/update", i);
+				sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_02/update", Etichetta);
 				//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 				rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 				printf("Publish returned : %d \n", rc);
@@ -2620,7 +2670,7 @@ int main(int argc, char **argv) {
 				printf("Send shadow %d (len %d )  %s \n", i, strlen(json_string), json_string);
 				//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 				paramsQOS0.payloadLen = strlen(cPayload);
-				sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/energy_time_03/update", i);
+				sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_03/update", Etichetta);
 				//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );					
 				rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);																																																																	
 				printf("Publish returned : %d \n", rc);
@@ -2633,7 +2683,7 @@ int main(int argc, char **argv) {
 			print_json_status();
 			sprintf(cPayload, "%s", json_string);	
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/status/update");
+			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/status/update", Etichetta);
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);
 			published &=~SHADOW_ENERGY_TIME_PUBLISHED;
@@ -2646,7 +2696,7 @@ int main(int argc, char **argv) {
 			//printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(json_string));//, json_string);
 			printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(cPayload));//, cPayload);
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/cuconfig/update");
+			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/cuconfig/update", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);

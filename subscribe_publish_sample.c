@@ -51,8 +51,7 @@
 #include "Ram.h"
 
 //pp
-
-
+u32 Etichetta;
 u8      BufferUpdate[512*1024];
 //      Tipo di centrale FM oppure SD
 u8      TipoCentrale;
@@ -1200,7 +1199,7 @@ static bool flag_tx_json_command = false;
 
 static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, uint16_t topicNameLen,
 									IoT_Publish_Message_Params *params, void *pData) {
-	char value[256];    
+	char value[1024];    
 	char name[50];    
 	IOT_UNUSED(pData);
 	IOT_UNUSED(pClient);
@@ -1295,7 +1294,7 @@ void print_json_command(int msg[]) {
 	strcat(json_string, appo);	
 
     //aggiungo "cu_id":"99998","cu_type":"logicafm"
-	sprintf(appo, "\"cu_id\":\"99998\",\"cu_type\":\"logicafm\"");
+	sprintf(appo, "\"cu_id\":\"%5d\",\"cu_type\":\"logicafm\"", Etichetta);
 	strcat(json_string, appo);	
 
 
@@ -1305,7 +1304,7 @@ void print_json_command(int msg[]) {
 }
 
 
-void convertStringToByte(char* st, int byte[]){
+void convertStringToByte(char* st, int byte[]) {
     
     int i;
     char stTemp[2];
@@ -1349,7 +1348,7 @@ unsigned char calcCRC(int byte[]){
 void gestOpcodeMain(int byte[]){
     
     //int byteTx[20];
-	switch(byte[2]){
+	switch(byte[2]) {
 
 		case  OPCODE_GET_SW_INFO_CU: //0x01
 			printf("RX GET SW INFO CU\n");
@@ -1901,6 +1900,9 @@ u32 ReadEtichettaCentrale (void) {
     ssize_t nRead;
     int     i;
 
+	//per il momento devo ritornare 99998
+	return 99998;
+
     fp = open("/etc/hostname", O_RDONLY);
     if (fp > 0) {
         memset (AuxBuf, 0, sizeof(AuxBuf));
@@ -2020,7 +2022,7 @@ void create_json_shadow_0() {
 	char str_appo[100] = {};
 	int i=0;
 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\",\"num_lamp_found\":%d,\"etichetta\":%d,\"codice_impianto\":%d,\"radio_id\":%d,\"flags\":\"%02x%02x%02x%02x%02x%02x%02x%02x\",\"err_12h\":\"%08X\",\"err_24h\":\"%08X\",\"lamp\":[",gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"num_lamp_found\":%d,\"etichetta\":%d,\"codice_impianto\":%d,\"radio_id\":%d,\"flags\":\"%02x%02x%02x%02x%02x%02x%02x%02x\",\"err_12h\":\"%08X\",\"err_24h\":\"%08X\",\"lamp\":[", Etichetta, gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
 
 	for (i=0 ; i<50 ; i++) {
 		if (i == (50-1))
@@ -2040,7 +2042,7 @@ void create_json_shadow_lum(int j) {
 	char str_appo[100] = {};
 	int i=0;
 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\",\"lamp\":[",gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"lamp\":[", Etichetta, gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
 
 	for (i=50*j ; i<((50+50*j)-1) ; i++) {
 		if (i == ((50+50*j)-1))
@@ -2092,7 +2094,7 @@ void print_json(char *buffer, unsigned int which_shadow) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed=true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",", Etichetta );
     for (j=0; j < NUM_BLOCK; j++) {
 		//cerco il bit which_shadow*NUM_BLOCK+j
 		//if((changed[((which_shadow*NUM_BLOCK)+j)/8]^(1<<(j%8))) == 0) {
@@ -2131,7 +2133,7 @@ void print_json_energy_and_time(u8 quale_shadow) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed = true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",", Etichetta);
     strcat(json_string, appo);	
 	//printf("appo is %s json is %s", appo, json_string);
 		//il primo blocco non ha la virgola davanti. 
@@ -2196,7 +2198,7 @@ void print_json_cuconfig(void) {
 	int j = 0;
 	char appo[MAX_LEN_SHADOW+1];
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\",\"blocks_modified\":\"" );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"blocks_modified\":\"", Etichetta );
 	
 	for (j=0; j < (NUM_BLOCK*LEN_BLOCK/8); j++){
 		sprintf(appo, "%02X", changed[j]);
@@ -2218,7 +2220,7 @@ void print_json_status(void) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed=true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",,\"cu_desc\":\"Centrale piano terra\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"cu_desc\":\"Centrale piano terra\",\"update\":\"completed\",", Etichetta );
     //if (p_shmem_cenlin->status_changed) {
 	sprintf(appo, "\"status\":\"");
 	strcat(json_string, appo);	
@@ -2238,11 +2240,6 @@ void print_json_status(void) {
 	sprintf(appo, ",\"timestamp\":");
 	strcat(json_string, appo);	
 	sprintf(appo, "%d", p_shmem_cenlin->statoCenlin.Timestamp);
-	strcat(json_string, appo);	
-
-	sprintf(appo, ",\"timeZone\":\"");
-	strcat(json_string, appo);	
-	sprintf(appo, "01\"");
 	strcat(json_string, appo);	
 
 	sprintf(appo, ",\"testRunning\":\"");
@@ -2310,7 +2307,7 @@ void print_json_errors(void) {
 	char appo[MAX_LEN_SHADOW+1];
 	bool primoblocco_changed=true;
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"99998\",\"update\":\"completed\"," );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",", Etichetta );
     
     //if (p_shmem_cenlin->errors_changed) {
 	sprintf(appo, "\"errors\":\"");
@@ -2420,6 +2417,11 @@ int main(int argc, char **argv) {
 	time_t t;
 	struct tm time_now; 
 	u32 cnt_cicle=0;
+	char appo_str[30];
+    //	Load etichetta CenLin
+    Etichetta = ReadEtichettaCentrale ();
+    printf("Etichetta is %d \n", Etichetta);
+
 
 	printf("create thread \n");
 	res = pthread_create(&id_thread0, NULL, thread_shmem, NULL);
@@ -2497,7 +2499,8 @@ int main(int argc, char **argv) {
 	}
 
 	IOT_INFO("Subscribing...");
-	rc = aws_iot_mqtt_subscribe(&client, "logicafm_99998/command", 22, QOS0, iot_subscribe_callback_handler, NULL);
+	sprintf(appo_str, "logicafm_%5d/command_fm", Etichetta);
+	rc = aws_iot_mqtt_subscribe(&client, appo_str, 25, QOS0, iot_subscribe_callback_handler, NULL);
 	if(SUCCESS != rc) {
 		IOT_ERROR("Error subscribing : %d ", rc);
 		return rc;
@@ -2520,7 +2523,7 @@ int main(int argc, char **argv) {
 	paramsQOS1.payload = (void *) cPayload;
 	paramsQOS1.isRetained = 0;
 
-	if(publishCount != 0) {
+	if (publishCount != 0) {
 		infinitePublishFlag = false;
 	}
 	
@@ -2580,7 +2583,7 @@ int main(int argc, char **argv) {
 					printf("Send shadow %d (len %d )  %s \n", i, strlen(json_string), json_string);
 					//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 					paramsQOS0.payloadLen = strlen(cPayload);
-					sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/param%02d/update", i);
+					sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/param%02d/update", Etichetta, i);
 					//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 					rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 					printf("Publish returned : %d \n", rc);
@@ -2596,7 +2599,7 @@ int main(int argc, char **argv) {
 			//printf("Send shadow status (len %d )  \n", strlen(json_string));//, json_string);
 			printf("Send shadow status : %s  \n", cPayload);
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/status/update");
+			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/status/update", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);
@@ -2612,7 +2615,7 @@ int main(int argc, char **argv) {
 			//printf("Send shadow status (len %d )  \n", strlen(json_string));//, json_string);
 			printf("Send shadow status : %s  \n", cPayload);
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/errors/update");
+			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/errors/update", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);
@@ -2629,7 +2632,7 @@ int main(int argc, char **argv) {
 			//printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(json_string));//, json_string);
 			printf("Send shadow command (len %d )  \n", strlen(cPayload));
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "logicafm_99998/response");
+			sprintf(str_topic_shadow, "logicafm_%5d/response", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);
@@ -2649,7 +2652,7 @@ int main(int argc, char **argv) {
 			printf("Send shadow %d (len %d )  -%s- \n", i, strlen(json_string), json_string);
 			//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/energy_time_00/update", i);
+			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_00/update", Etichetta, i);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);
@@ -2660,7 +2663,7 @@ int main(int argc, char **argv) {
 				printf("Send shadow %d (len %d )  %s \n", i, strlen(json_string), json_string);
 				//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 				paramsQOS0.payloadLen = strlen(cPayload);
-				sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/energy_time_01/update", i);
+				sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_01/update", Etichetta);
 				//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 				rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 				printf("Publish returned : %d \n", rc);
@@ -2672,7 +2675,7 @@ int main(int argc, char **argv) {
 				printf("Send shadow %d (len %d )  %s \n", i, strlen(json_string), json_string);
 				//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 				paramsQOS0.payloadLen = strlen(cPayload);
-				sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/energy_time_02/update", i);
+				sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_02/update", Etichetta);
 				//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 				rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 				printf("Publish returned : %d \n", rc);
@@ -2684,7 +2687,7 @@ int main(int argc, char **argv) {
 				printf("Send shadow %d (len %d )  %s \n", i, strlen(json_string), json_string);
 				//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 				paramsQOS0.payloadLen = strlen(cPayload);
-				sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/energy_time_03/update", i);
+				sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_03/update", Etichetta);
 				//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );					
 				rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);																																																																	
 				printf("Publish returned : %d \n", rc);
@@ -2697,7 +2700,7 @@ int main(int argc, char **argv) {
 			print_json_status();
 			sprintf(cPayload, "%s", json_string);	
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/status/update");
+			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/status/update", Etichetta);
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);
 			published &=~SHADOW_ENERGY_TIME_PUBLISHED;
@@ -2710,7 +2713,7 @@ int main(int argc, char **argv) {
 			//printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(json_string));//, json_string);
 			printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(cPayload));//, cPayload);
 			paramsQOS0.payloadLen = strlen(cPayload);
-			sprintf(str_topic_shadow, "$aws/things/logicafm_99998/shadow/name/cuconfig/update");
+			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/cuconfig/update", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
 			printf("Publish returned : %d \n", rc);

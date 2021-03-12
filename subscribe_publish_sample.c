@@ -1235,29 +1235,40 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
     ///int num_value = (int)strtol(value, NULL, 16);
 	///printf("converto il primo carattere in un intero : %d \n", num_value );
 
-    unsigned char numBytes, ctrlCode, opcode; 
-	int byteF[30];
+    unsigned char numBytes, ctrlCode, opcode, char_1, char_2; 
+	int byteF[150];
 	convertStringToByte(value, byteF);
-	numBytes = byteF[0];
-	ctrlCode = byteF[1];
-	opcode = byteF[2];
 
-    printf("LD len = %d\n",numBytes);
+	char_1 = byteF[0];
+	char_2 = byteF[1];
+	printf("char_1 = %02x - %c  char_2 = %02x - %c\n",byteF[0],byteF[0],byteF[1],byteF[1]);
+	
+	if((char_1 == 'L')&&(char_2 = 'O' )){
+		numBytes = byteF[2];
+		ctrlCode = byteF[3];
+		opcode = byteF[4];
 
-	for (int i=0; i<numBytes; i++)
-        printf("byte[%d] = %d\n",i,byteF[i]);
+		printf("LD len = %d\n",numBytes);
 
-     //controllo crc e gestione codice operativo
-	if(checkCRC(byteF)){
-		printf("CRC OK\n");
-		if(ctrlCode&0x01)
-			gestOpcodeWIFI(byteF);
-		else gestOpcodeMain(byteF);
-		
-		//mando la risposta
-	    flag_tx_json_command=TRUE;
+		for (int i=0; i<numBytes; i++){
+			printf("byte[%d] = %d\n",i,byteF[i]);
+			byteF[i]=byteF[i+2];
+		}
 
-	}else printf("CRC ERROR\n");
+		//controllo crc e gestione codice operativo
+		if(checkCRC(byteF)){
+			printf("CRC OK\n");
+			if(ctrlCode&0x01)
+				gestOpcodeWIFI(byteF);
+			else gestOpcodeMain(byteF);
+			
+			//mando la risposta
+			flag_tx_json_command=TRUE;
+
+		}else printf("CRC ERROR\n");
+	}else{
+		printf("Gestione protocollo FD\n");	
+	}
 	
 }
 

@@ -1269,6 +1269,12 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 		}else printf("CRC ERROR\n");
 	}else{
 		printf("Gestione protocollo FD\n");	
+		//devo rigirare il messaggio senza lo stuffing che è previsto nel protocollo.
+		while(bytef[i]!=0xFE){}
+		for (int i=0; i<numBytes; i++){
+			printf("byte[%d] = %d\n",i,byteF[i]);
+			byteF[i]=byteF[i+2];
+		}
 	}
 	
 }

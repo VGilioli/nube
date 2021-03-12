@@ -301,6 +301,8 @@ struct shmem_cenlin* p_shmem_cenlin;
 #define 	OPCODE_SET_TIPO_PRODOTTO_FINITO     	0x74   
 #define 	OPCODE_GET_TIPO_PRODOTTO_FINITO     	0x75   
 
+#define 	OPCODE_PROTOCOL_FD				     	0xFD  
+
 //Lista opcodes micro WiFi (quello che si occupa della connessione al cloud):
 #define 	OPCODE_GET_SW_INFO                  	0x01
 #define 	OPCODE_GET_STATUS_ALARM             	0x02   
@@ -1192,6 +1194,7 @@ void gestOpcodeMain(int byte[]);
 void gestOpcodeWIFI(int byte[]);
 void gestCmdPassThrough(int byte[]);
 void print_json_command(int msg[]);
+void gestProtocolFD(int byte[]);
 
 static bool flag_tx_json_command = false;
 
@@ -1269,11 +1272,17 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	}else{
 		printf("Gestione protocollo FD\n");	
 		//devo rigirare il messaggio senza lo stuffing che è previsto nel protocollo.
-		while(bytef[i]!=0xFE){}
-		for (int i=0; i<numBytes; i++){
-			printf("byte[%d] = %d\n",i,byteF[i]);
-			byteF[i]=byteF[i+2];
-		}
+		int i = 2;
+		if(byteF[i]==0xFD){
+			while(byteF[i]!=0xFE){
+				if(byteF[i]==0xFA){
+					byteF[i-2]=byteF[i]+byteF[i+1];
+					printf("byte[%d] = %d\n",i,byteF[i]);
+					i++;
+				}
+			}
+			gestProtocolFD(byteF);
+		}else printf("ERROR RX FD PROTOCOL\n");
 	}
 	
 }
@@ -1344,6 +1353,30 @@ unsigned char calcCRC(int byte[]){
 	 return sum;	
 }
 
+void gestProtocolFD(int byte[]){
+
+			int i = 0;
+			//devo passare i dati alla cenlin
+			p_shmem_cenlin->new_message = 1;
+			printf("TX MSG FD TO CENLIN: ");
+			p_shmem_cenlin->message[0] = OPCODE_PROTOCOL_FD;
+			printf("%d",p_shmem_cenlin->message[0]);
+			while(byte[i]!=0xFE){
+				p_shmem_cenlin->message[i+1] = byte[i];
+				printf("%d",p_shmem_cenlin->message[i+1]);
+				i++;
+			}
+			i++;
+			p_shmem_cenlin->message[i+1] = byte[i];
+			printf("%d\n",p_shmem_cenlin->message[i+1]);
+
+
+			//Dovro gestire la risposta che mi arriverà dalla cenlin ????
+			//bufferTx[0]=0x04;//numBytes 
+			//bufferTx[1]=0x00;//ctrlCode 
+ 			//bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
+			//bufferTx[3]=calcCRC(bufferTx);//CRC 
+}
 
 void gestOpcodeMain(int byte[]){
     

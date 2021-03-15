@@ -1239,7 +1239,7 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	///printf("converto il primo carattere in un intero : %d \n", num_value );
 
     unsigned char numBytes, ctrlCode, opcode, char_1, char_2; 
-	int byteF[150];
+	int byteF[300];
 	convertStringToByte(value, byteF);
 
 	char_1 = byteF[0];
@@ -1272,16 +1272,25 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	}else{
 		printf("Gestione protocollo FD\n");	
 		//devo rigirare il messaggio senza lo stuffing che è previsto nel protocollo.
-		int i = 2;
-		if(byteF[i]==0xFD){
-			while(byteF[i]!=0xFE){
-				if(byteF[i]==0xFA){
-					byteF[i-2]=byteF[i]+byteF[i+1];
-					printf("byte[%d] = %d\n",i,byteF[i]);
+		if(byteF[2]==0xFD){
+			numBytes = byteF[6]*255+byteF[7];
+
+			//while(byteF[i]!=0xFE){
+			int j=0;
+			for (int i=0; i<(numBytes+7); i++){
+				if(byteF[i+2]==0xFA){
+					byteF[j]=byteF[i+2]+byteF[i+3];
+					//printf("byte[%d] = %d\n",i,byteF[i]);
 					i++;
+				}else{
+					byteF[j]=byteF[i];
 				}
+				printf("byte[%d] = %d\n",j,byteF[j]);
+				j++;
 			}
 			gestProtocolFD(byteF);
+			//mando la risposta
+			flag_tx_json_command=TRUE;
 		}else printf("ERROR RX FD PROTOCOL\n");
 	}
 	
@@ -1356,6 +1365,7 @@ unsigned char calcCRC(int byte[]){
 void gestProtocolFD(int byte[]){
 
 			int i = 0;
+			int timeout = 0;
 			//devo passare i dati alla cenlin
 			p_shmem_cenlin->new_message = 1;
 			printf("TX MSG FD TO CENLIN: ");
@@ -1372,6 +1382,26 @@ void gestProtocolFD(int byte[]){
 
 
 			//Dovro gestire la risposta che mi arriverà dalla cenlin ????
+			while((p_shmem_cenlin->new_message != 2)&&(timeout<5)){//mi aspetto 2 dalla cenlin metto 5 secondi di timeout
+				sleep(1);
+				timeout++;
+			}
+			if (p_shmem_cenlin->new_message == 2){
+				//invio la risposta corretta che ho ricevuto dalla cenlin
+				i=0;
+				while(p_shmem_cenlin->message[i]!=0xFE){
+					bufferTx[i]=p_shmem_cenlin->message[i];
+					i++;
+				}
+
+			}else{
+				bufferTx[0]=0x04;//numBytes 
+				bufferTx[1]=0x01;//ctrlCode ERRORE OPCODE NON GESTITO = 0x01
+ 				bufferTx[2]=OPCODE_PROTOCOL_FD; //ripeto l'opcode nella risposta
+				bufferTx[3]=calcCRC(bufferTx);//CRC 
+				//invio un messaggio di errore
+			}
+
 			//bufferTx[0]=0x04;//numBytes 
 			//bufferTx[1]=0x00;//ctrlCode 
  			//bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta

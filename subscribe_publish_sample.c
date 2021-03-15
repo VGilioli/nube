@@ -1193,7 +1193,7 @@ void gestOpcodeMain(int byte[]);
 void gestOpcodeWIFI(int byte[]);
 void gestCmdPassThrough(int byte[]);
 void print_json_command(int msg[]);
-void gestProtocolFD(int byte[]);
+void gestProtocolFD(int byte[], int n);
 
 static bool flag_tx_json_command = false;
 
@@ -1250,7 +1250,7 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 		ctrlCode = byteF[3];
 		opcode = byteF[4];
 
-		printf("1 LD len = %d\n",numBytes);
+		printf("Gestione protocollo LD len = %d\n",numBytes);
 
 		for (int i=0; i<numBytes; i++){
 			printf("byte[%d] = %d\n",i,byteF[i]);
@@ -1268,29 +1268,33 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 			flag_tx_json_command=TRUE;
 
 		}else printf("CRC ERROR\n");
-	}else{
+	} else if((char_1 == 'F')&&(char_2 = 'D' )) {
 		printf("Gestione protocollo FD\n");	
 		//devo rigirare il messaggio senza lo stuffing che è previsto nel protocollo.
 		if(byteF[2]==0xFD){
 			numBytes = byteF[6]*255+byteF[7];
 
-			//while(byteF[i]!=0xFE){
 			int j=0;
-			for (int i=0; i<(numBytes+7); i++){
-				if(byteF[i+2]==0xFA){
+			for (int i=0; i<(numBytes+9); i++){
+/*				if(byteF[i+2]==0xFA){
 					byteF[j]=byteF[i+2]+byteF[i+3];
 					//printf("byte[%d] = %d\n",i,byteF[i]);
 					i++;
 				}else{
 					byteF[j]=byteF[i];
 				}
+*/				
+			    byteF[j]=byteF[i+2];
 				printf("byte[%d] = %d\n",j,byteF[j]);
 				j++;
 			}
-			gestProtocolFD(byteF);
+			printf("vado a fare la copia in shared \n");
+			gestProtocolFD(byteF,j);
 			//mando la risposta
 			flag_tx_json_command=TRUE;
 		}else printf("ERROR RX FD PROTOCOL\n");
+	} else {
+		printf("Protocollo command non riconosciuto !!!! ");
 	}
 	
 }
@@ -1361,7 +1365,7 @@ unsigned char calcCRC(int byte[]){
 	 return sum;	
 }
 
-void gestProtocolFD(int byte[]) {
+void gestProtocolFD(int byte[], int n) {
 
 			int i = 0;
 			int timeout = 0;
@@ -1369,15 +1373,16 @@ void gestProtocolFD(int byte[]) {
 			p_shmem_cenlin->new_message = 1;
 			printf("TX MSG FD TO CENLIN: ");
 			p_shmem_cenlin->message[0] = OPCODE_PROTOCOL_FD;
-			printf("%d",p_shmem_cenlin->message[0]);
-			while(byte[i]!=0xFE) {
+			printf("%02X",p_shmem_cenlin->message[0]);
+			//while(byte[i]!=0xFE){
+			for (i=1; i<n; i++) {
 				p_shmem_cenlin->message[i+1] = byte[i];
-				printf("%d",p_shmem_cenlin->message[i+1]);
-				i++;
+				printf("%02X",p_shmem_cenlin->message[i+1]);
+				//i++;
 			}
-			i++;
-			p_shmem_cenlin->message[i+1] = byte[i];
-			printf("%d\n",p_shmem_cenlin->message[i+1]);
+			//i++;
+			//p_shmem_cenlin->message[i+1] = byte[i];
+			//printf("%d\n",p_shmem_cenlin->message[i+1]);
 
 
 			//Dovro gestire la risposta che mi arriverà dalla cenlin ????

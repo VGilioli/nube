@@ -1238,7 +1238,7 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	///printf("converto il primo carattere in un intero : %d \n", num_value );
 
     unsigned char numBytes, ctrlCode, opcode, char_1, char_2; 
-	int byteF[150];
+	int byteF[300];
 	convertStringToByte(value, byteF);
 
 	char_1 = byteF[0];
@@ -1271,11 +1271,26 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	}else{
 		printf("Gestione protocollo FD\n");	
 		//devo rigirare il messaggio senza lo stuffing che è previsto nel protocollo.
-		int i = 2;
 		if(byteF[2]==0xFD){
-			
+			numBytes = byteF[6]*255+byteF[7];
+
+			//while(byteF[i]!=0xFE){
+			int j=0;
+			for (int i=0; i<(numBytes+7); i++){
+				if(byteF[i+2]==0xFA){
+					byteF[j]=byteF[i+2]+byteF[i+3];
+					//printf("byte[%d] = %d\n",i,byteF[i]);
+					i++;
+				}else{
+					byteF[j]=byteF[i];
+				}
+				printf("byte[%d] = %d\n",j,byteF[j]);
+				j++;
+			}
 			gestProtocolFD(byteF);
-		} else printf("ERROR RX FD PROTOCOL\n");
+			//mando la risposta
+			flag_tx_json_command=TRUE;
+		}else printf("ERROR RX FD PROTOCOL\n");
 	}
 	
 }
@@ -1346,16 +1361,16 @@ unsigned char calcCRC(int byte[]){
 	 return sum;	
 }
 
-
-void gestProtocolFD(int byte[]){
+void gestProtocolFD(int byte[]) {
 
 			int i = 0;
+			int timeout = 0;
 			//devo passare i dati alla cenlin
 			p_shmem_cenlin->new_message = 1;
 			printf("TX MSG FD TO CENLIN: ");
 			p_shmem_cenlin->message[0] = OPCODE_PROTOCOL_FD;
 			printf("%d",p_shmem_cenlin->message[0]);
-			while(byte[i]!=0xFE){
+			while(byte[i]!=0xFE) {
 				p_shmem_cenlin->message[i+1] = byte[i];
 				printf("%d",p_shmem_cenlin->message[i+1]);
 				i++;
@@ -1366,11 +1381,33 @@ void gestProtocolFD(int byte[]){
 
 
 			//Dovro gestire la risposta che mi arriverà dalla cenlin ????
+			while((p_shmem_cenlin->new_message != 2)&&(timeout<5)){//mi aspetto 2 dalla cenlin metto 5 secondi di timeout
+				sleep(1);
+				timeout++;
+			}
+			if (p_shmem_cenlin->new_message == 2) {
+				//invio la risposta corretta che ho ricevuto dalla cenlin
+				i=0;
+				while(p_shmem_cenlin->message[i]!=0xFE) {
+					bufferTx[i]=p_shmem_cenlin->message[i];
+					i++;
+				}
+
+			} else {
+				bufferTx[0]=0x04;//numBytes 
+				bufferTx[1]=0x01;//ctrlCode ERRORE OPCODE NON GESTITO = 0x01
+ 				bufferTx[2]=OPCODE_PROTOCOL_FD; //ripeto l'opcode nella risposta
+				bufferTx[3]=calcCRC(bufferTx);//CRC 
+				//invio un messaggio di errore
+			}
+
 			//bufferTx[0]=0x04;//numBytes 
 			//bufferTx[1]=0x00;//ctrlCode 
  			//bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
 			//bufferTx[3]=calcCRC(bufferTx);//CRC 
 }
+
+
 
 void gestOpcodeMain(int byte[]){
     
@@ -1988,8 +2025,8 @@ void ReloadSpiFlashInitParam (void)
 
     SpiFlashReadParam (SPI_FLASH_ADDR_PAR_TOT_NODI, b, 2);
     gTotNodi = (u16) (((u16)b[0] << 8) | b[1]);
-    gTotNodi = MIN (gTotNodi, MAX_NODE);
-    for (i=0 ; i<gTotNodi ; i++) {
+    gTotNodi = MIN (p_shmem_cenlin->gTotNodi, MAX_NODE);
+    for (i=0 ; i<p_shmem_cenlin->gTotNodi ; i++) {
         SpiFlashReadParam (SPI_FLASH_ADDR_PAR_CONFIG_NODES + (i*SIZEOF_PAR_CONFIG_NODES) + OFFSET_PAR_CONFIG_NODES_ADDR_NODE, (u8 *)&Node[i].Config.Addr, 4);
         SpiFlashReadParam (SPI_FLASH_ADDR_PAR_CONFIG_NODES + (i*SIZEOF_PAR_CONFIG_NODES) + OFFSET_PAR_CONFIG_NODES_FATHER, b, 2);
         Node[i].Config.ProgrPadre = (u16) ((u16)(b[0]) << 8) | b[1];
@@ -2049,7 +2086,7 @@ void create_json_shadow_0() {
 	char str_appo[100] = {};
 	int i=0;
 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"num_lamp_found\":%d,\"etichetta\":%d,\"codice_impianto\":%d,\"radio_id\":%d,\"flags\":\"%02x%02x%02x%02x%02x%02x%02x%02x\",\"err_12h\":\"%08X\",\"err_24h\":\"%08X\",\"lamp\":[", Etichetta, gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"num_lamp_found\":%d,\"etichetta\":%d,\"codice_impianto\":%d,\"radio_id\":%d,\"flags\":\"%02x%02x%02x%02x%02x%02x%02x%02x\",\"err_12h\":\"%08X\",\"err_24h\":\"%08X\",\"lamp\":[", Etichetta, p_shmem_cenlin->gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
 
 	for (i=0 ; i<50 ; i++) {
 		if (i == (50-1))
@@ -2069,7 +2106,7 @@ void create_json_shadow_lum(int j) {
 	char str_appo[100] = {};
 	int i=0;
 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"lamp\":[", Etichetta, gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"lamp\":[", Etichetta, p_shmem_cenlin->gTotNodi, EtichettaSupInv, CodiceImpiantoSupInv, RadioIDSupInv, SupinvFlags[0], SupinvFlags[1], SupinvFlags[2], SupinvFlags[3], SupinvFlags[4], SupinvFlags[5], SupinvFlags[6], SupinvFlags[7], NSecErrCom12H, NSecErrCom24H  );
 
 	for (i=50*j ; i<((50+50*j)-1) ; i++) {
 		if (i == ((50+50*j)-1))

@@ -1194,7 +1194,7 @@ void gestOpcodeMain(int byte[]);
 void gestOpcodeWIFI(int byte[]);
 void gestCmdPassThrough(int byte[]);
 void print_json_command(int msg[]);
-void gestProtocolFD(int byte[]);
+void gestProtocolFD(int byte[], int n);
 
 static bool flag_tx_json_command = false;
 
@@ -1288,7 +1288,7 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 				printf("byte[%d] = %d\n",j,byteF[j]);
 				j++;
 			}
-			gestProtocolFD(byteF);
+			gestProtocolFD(byteF,j);
 			//mando la risposta
 			flag_tx_json_command=TRUE;
 		}else printf("ERROR RX FD PROTOCOL\n");
@@ -1362,7 +1362,7 @@ unsigned char calcCRC(int byte[]){
 	 return sum;	
 }
 
-void gestProtocolFD(int byte[]){
+void gestProtocolFD(int byte[], int n){
 
 			int i = 0;
 			int timeout = 0;
@@ -1371,14 +1371,15 @@ void gestProtocolFD(int byte[]){
 			printf("TX MSG FD TO CENLIN: ");
 			p_shmem_cenlin->message[0] = OPCODE_PROTOCOL_FD;
 			printf("%d",p_shmem_cenlin->message[0]);
-			while(byte[i]!=0xFE){
+			//while(byte[i]!=0xFE){
+			for (i=1; i<n; i++){
 				p_shmem_cenlin->message[i+1] = byte[i];
 				printf("%d",p_shmem_cenlin->message[i+1]);
-				i++;
+				//i++;
 			}
-			i++;
-			p_shmem_cenlin->message[i+1] = byte[i];
-			printf("%d\n",p_shmem_cenlin->message[i+1]);
+			//i++;
+			//p_shmem_cenlin->message[i+1] = byte[i];
+			//printf("%d\n",p_shmem_cenlin->message[i+1]);
 
 
 			//Dovro gestire la risposta che mi arriverà dalla cenlin ????

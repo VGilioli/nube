@@ -1386,18 +1386,18 @@ void gestProtocolFD(int byte[], int n) {
 
 
 			//Dovro gestire la risposta che mi arriverà dalla cenlin ????
-			while((p_shmem_cenlin->new_message != 2)&&(timeout<5)){//mi aspetto 2 dalla cenlin metto 5 secondi di timeout
+			while((p_shmem_cenlin->new_message != 2)&&(timeout<10)){//mi aspetto 2 dalla cenlin metto 5 secondi di timeout
 				sleep(1);
 				timeout++;
 			}
 			if (p_shmem_cenlin->new_message == 2) {
 				//invio la risposta corretta che ho ricevuto dalla cenlin
 				i=0;
-				while(p_shmem_cenlin->message[i]!=0xFE) {
+				while(i < ((p_shmem_cenlin->message[4]<<8|p_shmem_cenlin->message[5])+4)) {
 					bufferTx[i]=p_shmem_cenlin->message[i];
 					i++;
 				}
-
+				printf("La risposta a nube è di %d caratteri\n", i);
 			} else {
 				bufferTx[0]=0x04;//numBytes 
 				bufferTx[1]=0x01;//ctrlCode ERRORE OPCODE NON GESTITO = 0x01
@@ -2825,7 +2825,7 @@ int main(int argc, char **argv) {
 			publishCount--;
 		}
 		*/
-		sleep(5);
+		sleep(1);
 	}
 
 	// Wait for all the messages to be received vittorio

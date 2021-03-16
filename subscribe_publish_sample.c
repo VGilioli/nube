@@ -49,12 +49,12 @@
 #include "Parameter.h"
 #include "def.h"
 #include "Ram.h"
+#include "jsmn.h"
 
 //pp
 u32 Etichetta;
-u8      BufferUpdate[512*1024];
 //      Tipo di centrale FM oppure SD
-u8      TipoCentrale;
+////u8      TipoCentrale;
 u8		SupinvFlags[8];
 //	CVPS della centrale
 u16		CVPSSupInv;
@@ -63,26 +63,9 @@ u8		CodiceImpiantoSupInv;
 //      Address sul bus Rs485 della centrale Supinv
 u8		AddressBusCentraleSupInv[MAX_NUM_UART];
 //      Mappa a bit dei log disabilitati
-u8		MapBitLogDisabled[32];
-//      Puntatore in spi dei log
-u32		AddrSpiFlashLogBook;
-u32		AddrSpiFlashLogSnapshot;
-u32		AddrSpiFlashLogDig;
-
+////u8		MapBitLogDisabled[32];
 //	Codice di identificazione della centrale (etichetta)
 u32		EtichettaSupInv;
-//sem_t           semStatoNodi;
-//  Allarme sms
-u32     MaskSmsAlarm;
-//sem_t           semSmsAlarm;
-//	Lunghezza del programma di cui e stato fatto upgrade 
-u32		lLenProgramUpdate;
-//	ATTENZIONE ---------- OBBLIGATORIO tenere variabile RamProgNewCode[1000] in ultima posizione -----------------
-//	Spazio ProgNewCode in ram (spazio codice)
-u8      RamProgNewCode[1000];
-//	ATTENZIONE 1---------- OBBLIGATORIO tenere variabile RamProgNewCode[1000] in ultima posizione -----------------
-
-u8      MapBitScene[5];
 
 tTabFilesExSpiFlash TabFilesExSpiFlash[] = {
     {SPI_FLASH_PARAM_START_ADDR,                SPI_FLASH_PARAM_END_ADDR,               "/home/root/FM/Param.bin"},
@@ -164,7 +147,7 @@ AWS_IoT_Client client;
 //	---------------------------------------------------------------------------
 //	N.ro di gruppi di nodi programmabili e gestibili
 //	---------------------------------------------------------------------------
-#define	TOT_GROUPS                                  16
+////#define	TOT_GROUPS                          16
 #define NODE_TYPE_RELAIS_DOMOTICO           29
 
 //	---------------------------------------------------------------------------
@@ -187,7 +170,7 @@ AWS_IoT_Client client;
 #define NODE_TYPE_COVECO                    14
 #define NODE_TYPE_LAMPADE_LED               15
 #define NODE_TYPE_SOS_626_RIV_LUCE          16
-#define NODE_TYPE_MISRAD		    17
+#define NODE_TYPE_MISRAD		    		17
 #define NODE_TYPE_SMOTER                    18
 #define NODE_TYPE_STM                       19
 #define NODE_TYPE_BALERA                    20
@@ -205,36 +188,6 @@ AWS_IoT_Client client;
 #define NODE_TYPE_AMADORI                   32
 
 #define TOT_NODE_TYPE                       33
-
-
-//	---------------------------------------------------------------------------
-//	Lamp type
-//	---------------------------------------------------------------------------
-// Lampade LOGICA SE
-#define 	LAMP_TYPE_SE                        0xff
-#define         LAMP_TYPE_ELETTRINVERTER            0xfd
-#define         LAMP_TYPE_ALOG_2x10                 0xfc
-#define         LAMP_TYPE_ALOG_4x10                 0xfb
-#define         LAMP_TYPE_LOG_ELET_PRAEZ            0xf3
-#define         LAMP_TYPE_LOG_SE_BELGIO             0xf0
-#define         LAMP_TYPE_HALOGEN_KIT               0xee
-#define         LAMP_TYPE_SE_NICD_OFFICE            0xed
-#define         LAMP_TYPE_SE_NIMH                   0xeb
-#define         LAMP_TYPE_SE_IL_9W                  0xea
-#define         LAMP_TYPE_SE_IL_18W                 0xe9
-#define         LAMP_TYPE_MDL_300                   0xe6
-#define         LAMP_TYPE_TEST_ACCIAIO_LOG          0xe3
-#define         LAMP_TYPE_LSTPRZ                    0xe2
-#define         LAMP_TYPE_LOGICA_LED_SE             0xe0
-#define         LAMP_TYPE_RIP_LOG_FM	            0xde
-#define         LAMP_TYPE_F65_SE		    0xdb
-#define         LAMP_TYPE_COMPLETA_SE_OPTICOM       0xda
-#define         LAMP_TYPE_F65_SE_OPTICOM            0xd8
-#define         LAMP_TYPE_UPLED_SE_OPTICOM          0xd4
-#define         LAMP_TYPE_UPLED_SE_MULTI_OPTICOM    0xd0
-#define         LAMP_TYPE_LOG_LED_ULTIMATE_SE       0xce
-#define         LAMP_TYPE_F65_GRANLUCE_SE           0xcc
-
 
 #define	MAX(x,y) (x>y ? x : y)
 #define	MIN(x,y) (x<y ? x : y)
@@ -345,818 +298,7 @@ AWS_IoT_Client client;
 #define		SUBCODE_SET_CONFIG_LAMP					0x11
 #define		SUBCODE_SET_CONFIG_LAMP_MULTI			0x12
 
-
-typedef enum {
-	LAMP_LOGICA_FM,
-	CONTARISPARMIO,
-	LAMPADE_LED,
-	MISRAD,
-	MISPOT,
-	LAMPADE_LED_BALERA,
-	SENSORI_AUTOMAZIONE,
-	ZIGBAL,
-	CONCENTRATORE,
-	SENSORE_FOTONICO,
-	TRASMETTITORE_DOMOTICO,
-	RELAIS_DOMOTICO,
-	GP_ATMEL,
-	MISURATORE,
-	AMADORI,
-	DISPOSITIVO_NON_GESTITO
-} enumTipoDispositivo;
-
-
-
-
-// ---------------
-//	Struttura dati dei nodi dell'impianto
-// ---------------
-
-// EMERGENZA (LOGICA FM)
-// ---------  ---------
-typedef struct
-{
-	u8 				StatoFM;
-	u8 				ErrorFM;
-	u8 				StatoSAFM;
-	u8				TipoTuboFM;
-	u16                             DaliAddrFM;
-	u8 				MancataAutonomiaFM;
-	u8 				VBattFM;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;
-	u8				FreeAllineamentoUMDL0[2];
-	u8				Stato2FM;							// COM POLL 2
-	u8				FreeAllineamentoUMDL1[6];
-	u8				StatoOnOffErrLampada;				// PEr farlo corrispondere ai dati del UMDL
-	u8				FreeAllineamentoUMDL2[28];
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TLampLogicaFM;
-
-
-// CONTARISPARMIO (BARCON/BARCUN)
-// --------------  -------------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				PotEmerg;
-	u32                             Watt;
-	u8 				KWh[6];
-	u16				Free1Align;
-	u32				TempoOn;
-	u8				LinkQuality;
-	u8				SbilTubi;
-	u8				SbilTemp;
-	u8				StatoOnOffErrLampada;
-	u16				LumScalaHigh;
-	u16				LumScalaLow;
-	u16				Lum;
-	u8				Pwm;
-	u8				Free3Align;
-	u16				SetPoint;
-	u8				VMin;
-	u8				VMax;
-	u8				IMin;
-	u8				IMax;
-	u8				StatoBallast;
-	u8				StatoFail;
-	u8				LumScala;
-	u8				StatoFail2;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u16				PotMin;
-	u16				PotMax;
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TContaRisparmio;
-
-// MISRAD
-// ------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, Free0Align, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				Free0Align;
-	u32                             Watt;
-	u8 				KWh[6];
-	u16				Free1Align;
-	u32				TempoOn;
-	u8				LinkQuality;
-	u8				NumDisp;
-	u8				SbilTemp;
-	u8				VMin;
-	u8				VMax;
-	u8				IMin;
-	u8				IMax;
-	u8				StatoBallast;
-	u8				StatoFail;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TMisRad;
-
-
-// MISPOT
-// -------------------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				PotEmerg;
-	u32                             Watt;
-	u8 				KWh[6];
-	u16				Free1Align;
-	u32				TempoOn;
-	u8				LinkQuality;
-	u8				SbilTubi;
-	u8				SbilTemp;
-	u8				StatoOnOffErrLampada;
-	u16				LumScalaHigh;
-	u16				LumScalaLow;
-	u16				Lum;
-	u8				Pwm;
-	u8				LumScala;
-	u16				SetPoint;
-	u8				VMin;
-	u8				VMax;
-	u8				IMin;
-	u8				IMax;
-	u8				StatoBallast;
-	u8				StatoFail;
-	u8				TimerOreFail;
-	u8				StatoFail1;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u16				PotMin;
-	u16				PotMax;
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TMisPot;
-
-
-
-// LAMPADE A LED BALERA
-// -------------------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				PotEmerg;
-	u32                             Watt;
-	u8 				KWh[6];
-	u16				Free1Align;
-	u32				TempoOn;
-	u8				LinkQuality;
-	u8				SbilTubi;
-	u8				SbilTemp;
-	u8				StatoOnOffErrLampada;
-	u16				LumScalaHigh;
-	u16				LumScalaLow;
-	u16				Lum;
-	u8				Pwm;
-	u8				LumScala;
-	u16				SetPoint;
-	u8				VMin;
-	u8				VMax;
-	u8				IMin;
-	u8				IMax;
-	u8				StatoBallast;
-	u8				StatoFail;
-	u8				StatoFail2;
-	u8				StatoFail1;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u16				PotMin;
-	u16				PotMax;
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TLampadeLedBalera;
-
-
-// RELAIS DOMOTICO
-// ---------------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				PotEmerg;		//	Per il 20108 la potenza emegenza è in realtà la potenza minima che deve essere misurata dal rele ... altrimenti segnala errore 
-	u32                             Watt;
-	u8 				KWh[6];
-	u16				Free1Align;
-	u32				TempoOn;
-	u8				LinkQuality;
-	u8				exReqRele;
-	u8				exAutomaStatoRele;
-	u8				StatoOnOffErrLampada;
-	u16				ex_sp;
-	u16				Free4;
-	u16				Free5;
-	u8				Free6;
-	u8				Free7;
-	u16				Free8;
-	u8				Free9;
-	u8				Free10;
-	u8				Free11;
-	u8				Free12;
-	u8				StatoBallast;
-	u8				StatoFail;
-	u8				Priorita;
-	u8				ReleInitValueStartUp;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u8				ReqRele;				// ex. Pot Min
-	u8				AutomaStatoRele;
-	u8				StatoFisicoRele;		// ex. Pot Max	
-	u8				exPotMaxLow;
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TRelaisDomotico;
-
-
-// LAMPADE A LED  (BALELE)
-// -------------   ------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				PotEmerg;
-	u32                             Watt;
-	u8 				KWh[6];
-	u16				Free1Align;
-	u32				TempoOn;
-	u8				LinkQuality;
-	u8				SbilTubi;
-	u8				SbilTemp;
-	u8				Free2Align;
-	u16				LumScalaHigh;
-	u16				LumScalaLow;
-	u16				Lum;
-	u8				Pwm;
-	u8				LumScala;
-	u16				SetPoint;
-	u8				VMin;
-	u8				VMax;
-	u8				IMin;
-	u8				IMax;
-	u8				StatoBallast;
-	u8				StatoFail;
-	u8				StatoFail2;
-	u8				StatoFail1;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u16				PotMin;
-	u16				PotMax;
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TLampadeLed;
-
-
-
-// SENSORI AUTOMAZIONE
-// -------------------
-typedef struct
-{
-	u16				SensValue_V_or_I;
-	u8				SogliaEE;
-	u8				SensInAlarm;
-	u8				MappaEE[36];
-	u32                             Watt;
-	u8				LinkQuality;
-	u8				Free0;
-	u8				StatoBallast;
-	u8				StatoFail;
-	u8				Free1;
-	u32				TempoAutomazione;
-	u16				NumAttivazioniSens;
-	u16				Free1Align;
-	u32				TempoOn;
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TSensoriAutomazione;
-
-
-// TRASMETTITORE DOMOTICO
-// ---------------------
-typedef struct
-{
-	u16				AnalogValLowInput1;			//	UmdlTools
-	u16				AnalogValHighInput1;		//	UmdlTools
-	u16				AnalogValLowInput2;			//	UmdlTools
-	u16				AnalogValHighInput2;		//	UmdlTools
-	u16				TempoLastLevelInput1;		//	UmdlTools
-	u16				TempoLastLevelInput2;		//	UmdlTools
-	u8				ParEEConfigInput1;			//	UmdlTools
-	u8				ParEEConfigInput2;			//	UmdlTools
-	u16				Free0;
-	u16				TotAttivazioniInput1;		//	UmdlTools
-	u16				TotAttivazioniInput2;		//	UmdlTools
-	u32				TempoOn;
-	
-	u8				ParEEConfigCmdInput1;
-	u8				ParEEConfigCmdInput2;
-	u8				ParEECmdCodeInput1;
-	u8				ParEECmdCodeInput2;
-	u8				LinkQuality;
-	u8				Free1[19];
-	u8				DigitalValueInput1_2;		//	UmdlTools
-	u8				ParEESogliaInput1_2;		//	UmdlTools
-	u8				ParEEEnableAut;				//	UmdlTools
-	u8				Free2;						//	UmdlTools
-	
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TTrasmettitoreDomotico;
-
-
-
-// LAMPADE A LED BALERA3 (ZigBal)
-// -------------------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				PotEmerg;
-	u32                             Watt;
-	u8 				KWh[6];
-	u16				Free1Align;
-	u32				TempoOn;
-	u8				LinkQuality;
-	u8				TempH;
-	u8				TempL;
-	u8				StatoOnOffErrLampada;
-	u16				LumGrezzoPic;
-	u16				SpGrezzoPic;
-	u16				Lum;
-	u8				Pwm;
-	u8				Free3Align;
-	u16				SetPoint;
-	u16				SpGrezzoPicConDerating;
-	u8				CntFail;
-	u8				DeratingRunning;
-	u8				StatoBallast;
-	u8				StatoFail;
-	u8				StatoIngressi;
-	u8				StatoFail1;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u16				PotMin;
-	u16				PotMax;
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-        u8                              FreeLast[3];
-} TZigBal;
-
-// LAMPADE A LED AMADORI
-// -------------------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				PotEmerg;
-	u32                             Watt;
-	u8 				KWh[6];
-	u16				CmdRdPwr;
-	u32				TempoOn;
-	u8				LinkQuality;
-	u8				TempH;
-	u8				TempL;
-	u8				StatoOnOffErrLampada;
-	u16				Free_Ex_LumGrezzoPic;
-	u16				Free_Ex_SpGrezzoPic;
-	u16				Lum;
-	u8				Free_Ex_Pwm;
-	u8				Vmod;
-	u16				SetPoint;
-	u16				PwmStatus;
-	u8				AutomaPwmSt;
-	u8				NewCmdRdRele;
-	u8				StatoBallast;
-	u8				StatoFail;
-	u8				ActualPriority;
-	u8				StatoFail1;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u16				PotMin;
-	u16				PotMax;
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TAmadori;
-
-
-
-
-// Misuratore (MISATM)
-// -------------------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				PotEmerg;
-	u16                             Watt;
-	u16                             Tensione;
-	u8 				KWh[6];
-	u16				Free1Align;
-	u16				Corrente;
-	u16				PF;
-	u8				LinkQuality;
-	u8				Free0;
-	u8				Free1;
-	u8				StatoOnOffErrLampada;
-	u16				Free2;
-	u16				Free3;
-	u16				Free4;
-	u8				Free5;
-	u8				Free3Align;
-	u16				Free6;
-	u16				Free7;
-	u8				Free8;
-	u8				Free9;
-	u8				StatoBallast;
-	u8				StatoFail;
-	u8				Free10;
-	u8				Free11;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u32				TempoOn;		// Dalla versione 1.2 del misuratore (elimino pot. min e pot.max)
-//	u16				PotMin;
-//	u16				PotMax;
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TMisuratore;
-
-
-// CONCENTRATORE
-// -------------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				PotEmerg;
-	u32                             Watt;
-	u8 				KWh[6];
-	u16				Free1Align;
-	u32				TempoOn;
-	u8				LinkQuality;
-	u8				Free0;
-	u8				Free1;
-	u8				Free2Align;
-	u16				NroSensoriFotonici;
-	u16				NMinLastReset;
-	u16				Free4;
-	u8				Free5;
-	u8				Free3Align;
-	u16				Free6;
-	u16				Free7;
-	u8				Free8;
-	u8				Free9;
-	u8				Free10;
-	u8				Free11;
-	u8				Free12;
-	u8				Free13;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u16				Free14;
-	u16				Free15;
-	u8				Free16[6];
-	u8				Free17[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TConcentratore;
-
-
-
-// SENSORE FOTONICO
-// ----------------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				PotSost;
-	u16				PotEmerg;
-	u32                             Watt;
-	u8 				KWh[6];
-	u16				Free1Align;
-	u32				TempoOn;
-	u8				LinkQuality;
-	u8				V_CellaFotovoltaica;
-	u8				V_Soglia;
-	u8				nReset;
-	u16				NMinDaUltimaTx;
-	u16				Free3;
-	u16				Free4;
-	u8				Free5;
-	u8				Free3Align;
-	u16				Free6;
-	u16				Free7;
-	u8				Free8;
-	u8				Free9;
-	u8				Free10;
-	u8				Free11;
-	u8				Free12;
-	u8				Free13;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u16				Free14;
-	u16				Free15;
-	u8				Free16[6];
-	u8				Free17[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TSensoreFotonico;
-
-
-// MODULO RADIO GENERAL PURPOUSE ATMEL
-// -----------------------------------
-typedef struct
-{
-	//	I primi sei campi del record (PotSost, PotEmerg, Watt, KWh, Free1Align, TempoOn) devono essere in prima posizione in tutti i dispositivi UMDL (categorico....)
-	u16				Free1;
-	u16				Free2;
-	u32                             Free3;
-	u8 				Free4[6];
-	u16				Free5;
-	u32				Free6;
-	u8				LinkQuality;
-	u8				Free7;
-	u8				Free8;
-	u8				Free9;
-	u16				Free10;
-	u16				Free11;
-	u16				Free12;
-	u8				Free13;
-	u8				Free14;
-	u16				Free15;
-	u16				Free16;
-	u8				Free17;
-	u8				Free18;
-	u8				Free19;
-	u8				Free20;
-	u8				Free21;
-	u8				Free22;
-	u8				DayOfSample;
-	u8 				MonthOfSample;
-	u8 				YearOfSample;
-	u8 				HourOfSample;
-	u8 				MinOfSample;
-	u8 				SecOfSample;	
-	u16				Free23;
-	u16				Free24;
-	u8				Gruppi[6];
-	u8				Cvps[8];			//	CVPS del nodo bit=1 Cvps memorizzato ok, bit=0 Cvps non ancora letto o diverso (Cvps [0..16]) 
-	u8				RadioID[2];
-	u8				CodiceImpianto;
-} TGpAtmel;
-
-
-
-
-
 // --------------------------------------------
-typedef enum {
-	RADIO_JOB_ERROR,
-	RADIO_JOB_ERROR_NO_ACK_LOCAL,
-	RADIO_JOB_ERROR_NO_ANSWER, // = nessun messaggio ricevuto (errore di comunicazione radio)
-	RADIO_JOB_ERROR_INVALID_ANSWER,  // = ho ricevuto messaggi, ma non la risposta attesa (errore di comunicazione radio)	
-	RADIO_JOB_ERROR_OP_FAIL_ANSWER, // = ricevuta risposta ma operazione richiesta fallita
-	RADIO_JOB_ERROR_PRX_RADIO_FAIL_ANSWER, // = ricevuta risposta da parte del nodo padre, ma comunicazione con nodo destinatario fallita
-	RADIO_JOB_OK
-} enumResultRadioJob;
-// --------------------------------------------
-
-typedef enum {
-	  POLL_NODO_NON_FATTO = 0,
-	  POLL_NODO_FATTO_OK,
-	  POLL_NODO_FATTO_ERR
-} enumResultPoll;
-
-typedef enum {
-	CV_DELETED = 0,
-	CV_ATTIVO,
-	CV_NON_SO
-} enumStatoCv;
-
-
-
-typedef struct
-{	
-	// cv:
-	u32				CvNumber;
-	enumStatoCv                     StatoCv;	
-	// info poll:
-	enumResultPoll                  Result;	 // result del poll del nodo	 
-	u32				DatetimeLastPollOkNsec; // timestamp dell'ultima sequenza di poll completata con successo	
-	u8 				LinkQuality;
-	u16                             Status;
-	u8 				Free;
-} TNodePoll;
-
-#define			NRO_MAX_PROXY               5
-
-//	Attenzione mantenere compatibilita tra questa struttura e i corrispondenti dati memorizzati in spi flash (vedi SpiFlash.h ...SPI_FLASH_ADDR_PAR_CONFIG_NODES)
-typedef struct
-{
-	// [inizio: Non cambiare l'ordine dei campi seguenti]
-	u32                             Addr;
-	u16				ProgrPadre; // 0=centrale; 1=primo nodo; ... n=n-esimo nodo
-	u8 				NodeType;
-	u8 				Tipo;
-	u8 				TipoHw;
-	u8 				TipoBatt;
-	u16                             SwVerNode;
-	u16                             SwVerProxy[NRO_MAX_PROXY];
-	u8                              Localizzazione;
-	u8				RigaLocalizzazione;
-	u8				ColonnaLocalizzazione;
-	u8				Quadro;
-	u8				TipoExt;		//	Ext del tipo lampada su smartdriver (Zigbal) (bit 7=1 .. tipo ESCO)
-	// [fine]
-
-	// Info calcolate dalla funzione ElaboraListaNodiPoll:
-	u8				Deep;
-	u8				DeepStandard;
-	u16                             NumFigli;
-	union {
-		u32			l;
-		struct {
-			boolean 	IsValid; 		//se non valido (eg: orfano) il nodo non viene pollato e non può essere neanche usato come "ripetitore"  
-			boolean 	IsEnabled; 		// permette di abilitare/disabilitare il poll di un nodo (può essere usato come "ripetitore"!)
-		} Bit;
-	}Flags;
-  } TConfig;
-
-
-typedef union
-{
-  TLampLogicaFM				LampLogicaFM;
-  TContaRisparmio			Contarisparmio;
-  TMisRad				MisRad;
-  TMisPot				MisPot;
-  TLampadeLed				LampadeLed;
-  TLampadeLedBalera			Balera;
-  TZigBal				ZigBal;
-  TAmadori				Amadori;
-  TSensoriAutomazione                   SensoriAutomazione;
-  TConcentratore			Concentratore;
-  TSensoreFotonico			SensoreFotonico;
-  TTrasmettitoreDomotico                TrasmettitoreDomotico;
-  TRelaisDomotico 			RelaisDomotico;
-  TGpAtmel				GpAtmel;
-  TMisuratore				Misuratore;
-} TStato;
-
-
-typedef struct
-{
-  TConfig           Config;
-  TStato            Stato;
-  TNodePoll         Poll;
-} TNode;
-
-TNode	Node[MAX_NODE];
-
-
-
-
-enumTipoDispositivo GetTipoDispositivo(u16 IndexNodo)
-{
-    switch(Node[IndexNodo].Config.NodeType)
-    {
-        //	Emergenza
-        case NODE_TYPE_FM:
-        case NODE_TYPE_ZIGMOD2:
-        case NODE_TYPE_ZIGMOD3:
-        case NODE_TYPE_ZIGMOD4:
-                return(LAMP_LOGICA_FM);
-        //	Umdl
-        case NODE_TYPE_LAMPADE_LED:
-                return(LAMPADE_LED);
-        case NODE_TYPE_MISRAD:
-                return(MISRAD);
-        case NODE_TYPE_MISPOT:
-                return(MISPOT);
-        case NODE_TYPE_BALERA:
-                return (LAMPADE_LED_BALERA);
-        case NODE_TYPE_ZIGBAL:
-                return (ZIGBAL);
-        case NODE_TYPE_AMADORI:
-                return (AMADORI);
-        case NODE_TYPE_SENSORI_AUTOMAZIONE:
-                return(SENSORI_AUTOMAZIONE);
-        case NODE_TYPE_TRASMETTITORE_DOMOTICO:
-                return(TRASMETTITORE_DOMOTICO);
-        case NODE_TYPE_RELAIS_DOMOTICO:
-                return (RELAIS_DOMOTICO);
-        case NODE_TYPE_CONCENTRATORE:
-                return(CONCENTRATORE);
-        case NODE_TYPE_SENSORE_FOTONICO:
-                return(SENSORE_FOTONICO);
-        case NODE_TYPE_CR:
-                return(CONTARISPARMIO);
-        case NODE_TYPE_GP_ATMEL:
-                return(GP_ATMEL);
-        case NODE_TYPE_MISURATORE:
-                return(MISURATORE);
-    }
-    return(DISPOSITIVO_NON_GESTITO);
-}
-
-
-// --------------------------------------------
-
-
-
-
-boolean IsLampTypeUMDL (u16 IndexNodo)
-{
-    switch (GetTipoDispositivo(IndexNodo)) {
-        case LAMPADE_LED:
-        case MISRAD:
-        case MISPOT:
-        case CONTARISPARMIO:
-        case LAMPADE_LED_BALERA:
-        case RELAIS_DOMOTICO:
-	case AMADORI:
-        case ZIGBAL:
-        case CONCENTRATORE:
-        case SENSORE_FOTONICO:
-        case MISURATORE:	
-            return (TRUE);
-            break;
-    }
-    return (FALSE);
-    }
-
-
 #define HOST_ADDRESS_SIZE 255
 /**
  * @brief Default cert location
@@ -1173,7 +315,7 @@ static char HostAddress[HOST_ADDRESS_SIZE] = AWS_IOT_MQTT_HOST;
  */
 static uint32_t port = AWS_IOT_MQTT_PORT;
 
-unsigned char blocks_changed[NUM_BLOCK*100];//attenzione !!!!
+////unsigned char blocks_changed[NUM_BLOCK*100];//attenzione !!!!
 unsigned char changed[256];
 /**
  * @brief This parameter will avoid infinite loop of publish and exit the program after certain number of publishes
@@ -1186,7 +328,6 @@ static unsigned char  bufferTx[500];
 //static char Payload[MAX_LEN_SHADOW+1];
 //static char str1_topic_shadow[100];
 static char json_string[MAX_LEN_SHADOW+1] = {}; 
-#include "jsmn.h"
 
 void convertStringToByte(char* st, int byte[]);
 bool checkCRC(int byte[]);
@@ -1228,7 +369,6 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 	memcpy(name, params->payload+key.start, length);
 	name[length] = '\0';
 	printf("Campo 1 is : %s\n", name);
-	//printf("1 - length is %d  key.end %d - key.start %d \n", length, key.end, key.start);
 	key = tokens[2];
 	length = key.end - key.start;
 	printf("2 - length is %d  key.end %d - key.start %d \n", length, key.end, key.start);
@@ -1902,12 +1042,6 @@ static void parseInputArgsForConnectParams(int argc, char **argv) {
 
 }
 
-
-
-
-
-
-
 //	Input: 
 //		Addr		<== Indirizzo della flash da leggere
 //		p 		<== Indirizzo di destinazione della lettura
@@ -1960,9 +1094,6 @@ u32 SpiFlashRead (u32 Addr, u8 *p, u32 NroBytes)
 
 }
 
-
-
-
 u32 SpiFlashReadParam (u32 AddrParam, u8 *p, u32 NroBytes)
 {
     u32		Result;
@@ -1971,10 +1102,6 @@ u32 SpiFlashReadParam (u32 AddrParam, u8 *p, u32 NroBytes)
 	
     return (Result);
 }
-
-
-
-
 
 //  Leggi il numero dell'etichetta
 //  Output : 0              ==> Numero dell'etichetta non valido
@@ -2008,104 +1135,7 @@ u32 ReadEtichettaCentrale (void) {
         return(0);
 }
 
-
-
-
-void ReloadSpiFlashInitParam (void)
-{
-    u32				i;
-    u8                          b[10];
-    
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_ADDR_BUS_SUPINV_UART, AddressBusCentraleSupInv, MAX_NUM_UART);
-	printf("AddressBusCentraleSupInv %d \n", AddressBusCentraleSupInv);
-    
-	SpiFlashReadParam (SPI_FLASH_ADDR_PAR_CODICE_IMPIANTO, &CodiceImpiantoSupInv, 1);
-	printf("CodiceImpiantoSupInv %d \n", CodiceImpiantoSupInv);
-
-    //	Load etichetta Supinv
-    EtichettaSupInv = ReadEtichettaCentrale ();
-    printf("EtichettaSupInv %s \n", EtichettaSupInv);
-
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_RADIO_ID, b, 2);
-    RadioIDSupInv = (u16) (((u16)b[0] << 8) | b[1]);
-	printf("RadioIDSupInv 0x%02X \n", RadioIDSupInv);
-
-    
-	SpiFlashReadParam (SPI_FLASH_ADDR_PAR_RADIO_ID_IN_FIND_NODES, b, 2);
-    RadioIDSupInvInFindNodes = (u16) (((u16)b[0] << 8) | b[1]);
-
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_CVPS_WORK_WITH, b, 2);
-    CVPSSupInv = (u16) (((u16)b[0] << 8) | b[1]);
-    
-    
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_FLAGS, SupinvFlags, sizeof(SupinvFlags));
-
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_ERR_COMM_12H, b, 4);
-    NSecErrCom12H = (u32) ( ((u32)b[0] << 24) | ((u32)b[1] << 16) | ((u32)b[2] << 8) | b[3]);
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_ERR_COMM_24H, b, 4);
-    NSecErrCom24H = (u32) ( ((u32)b[0] << 24) | ((u32)b[1] << 16) | ((u32)b[2] << 8) | b[3]);
-
-
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_TOT_NODI, b, 2);
-    gTotNodi = (u16) (((u16)b[0] << 8) | b[1]);
-    gTotNodi = MIN (p_shmem_cenlin->gTotNodi, MAX_NODE);
-    for (i=0 ; i<p_shmem_cenlin->gTotNodi ; i++) {
-        SpiFlashReadParam (SPI_FLASH_ADDR_PAR_CONFIG_NODES + (i*SIZEOF_PAR_CONFIG_NODES) + OFFSET_PAR_CONFIG_NODES_ADDR_NODE, (u8 *)&Node[i].Config.Addr, 4);
-        SpiFlashReadParam (SPI_FLASH_ADDR_PAR_CONFIG_NODES + (i*SIZEOF_PAR_CONFIG_NODES) + OFFSET_PAR_CONFIG_NODES_FATHER, b, 2);
-        Node[i].Config.ProgrPadre = (u16) ((u16)(b[0]) << 8) | b[1];
-        SpiFlashReadParam (SPI_FLASH_ADDR_PAR_CONFIG_NODES + (i*SIZEOF_PAR_CONFIG_NODES) + OFFSET_PAR_CONFIG_NODES_NODE_TYPE, (u8 *)&Node[i].Config.NodeType, LEN_USED_PAR_CONFIG_NODES-6);
-        
-        if (IsLampTypeUMDL((u16)i)) {
-                SpiFlashReadParam (SPI_FLASH_ADDR_PAR_POT_SOST_NODI_UMDL + (i * 2), b, 2);
-                Node[i].Stato.Contarisparmio.PotSost = (u16) ((u16)(b[0]) << 8) | (u16)(b[1]);
-        }
-        if (GetTipoDispositivo((u16)i) == RELAIS_DOMOTICO) {
-                //	Nel caso di rele domotico 20108.. la potenza in emergenza contiene la potenza minima che il rele deve consumare.. altrimenti segnalerà Fail.
-                SpiFlashReadParam (SPI_FLASH_ADDR_PAR_WATT_IN_EMERGENZA + (i * 2), b, 2);
-                Node[i].Stato.Contarisparmio.PotEmerg = (u16) ((u16)(b[0]) << 8) | (u16)(b[1]);
-        }
-    }
-	/*
-    for (i=0 ; i<TOT_ALARM_TYPES ; i++) {
-        SpiFlashReadParam (SPI_FLASH_ADDR_PAR_TOUT_FILT_CAUSE_ALLARME+(i*4), b, 4);
-        TOutAlarmCauseProg[i] = (u32) ( ((u32)b[0] << 24) | ((u32)b[1] << 16) | ((u32)b[2] << 8) | b[3]);
-    }
-    LoadTimeout ((short)(TOUT_FILTR_ALRM_SMS+ALARM_TYPE_NODO_ANOMALIA), TOutAlarmCauseProg[ALARM_TYPE_NODO_ANOMALIA]);
-    LoadTimeout ((short)(TOUT_FILTR_ALRM_SMS+ALARM_TYPE_NODO_COMM_ERR), TOutAlarmCauseProg[ALARM_TYPE_NODO_COMM_ERR]);
-
-
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_MAP_BIT_LOG_DISABLED, MapBitLogDisabled, 32);
-    //	Lettura tipo protocollo attivo sulla n linee seriali virtuali (FD, modbus rtu, modbus tcp-ip)
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_TIPO_PROT_UART, TipoProtUart, MAX_NUM_UART);
-    for (i=0 ; i<MAX_NUM_UART ; i++) {
-        TipoProtUart[i] = (TipoProtUart[i] < NRO_MAX_TIPO_PROT ? TipoProtUart[i] : TIPO_PROT_CENLOG);
-    }
-    //	Address del supinv nel protocollo modbus
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_MODBUS_ADDR_UART, ModbusAddr, MAX_NUM_UART);
-    //	Lingua selezionata
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_LINGUA_SEL, &LinguaSelected, 1);
-    //	Se lingua non selezionata, usa quella di default che e' italiano
-    LinguaSelected = (LinguaSelected < NRO_MAX_LINGUE ? LinguaSelected : SPI_PAR_LINGUA_SEL_DEFAULT);
-    //	Default dell'holding register di modbus che indica delay tra attuazione di eventi di automazione da modbus usando coils
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_MB_HR_DELAY_ATT_EVENTO, b, 2);
-    HoldingRegistersModbus[ADD_MB_HR_DELAY_ATT_EVENTO] = (u16) (((u16)b[0] << 8) | b[1]);
-    //	Load time out di ribadire scenari (eventi di propagazione)
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_TOUT_RIBADIRE_EVENTI, b, 4);
-    TOutRibadireEventi = (u32) ( ((u32)b[0] << 24) | ((u32)b[1] << 16) | ((u32)b[2] << 8) | b[3]);
-    if (TOutRibadireEventi == 0xffffffff)
-            TOutRibadireEventi = MIN_020;
-    //  Lettura del tipo di centrale
-    SpiFlashReadParam (SPI_FLASH_ADDR_PAR_TIPO_CENTRALE, &TipoCentrale, 1);
-    if (TipoCentrale >= NRO_TIPI_CENTRALE)
-        TipoCentrale = TIPO_CENTRALE_FM;
-		*/
-}
-
-
-
-
-
-void create_json_shadow_0() {
+/*void create_json_shadow_0() {
 	char str_appo[100] = {};
 	int i=0;
 
@@ -2122,10 +1152,10 @@ void create_json_shadow_0() {
 	sprintf(str_appo, "]}}}");
 	strcat(json_string, str_appo);
 	//printf("json string (%d nodi) : \n%s\n", gTotNodi,json_string );
-}
+}*/
 
 
-void create_json_shadow_lum(int j) {
+/*void create_json_shadow_lum(int j) {
 	char str_appo[100] = {};
 	int i=0;
 
@@ -2142,7 +1172,7 @@ void create_json_shadow_lum(int j) {
 	sprintf(str_appo, "]}}}");
 	strcat(json_string, str_appo);
 	//printf("json string (%d nodi) : \n%s\n", gTotNodi,json_string );
-}
+}*/
 
 
 
@@ -2442,7 +1472,7 @@ unsigned char compare_buffers(char *buffer, char *buffer1, unsigned int filesize
 
 
 
-static const size_t size = 4*1024;
+////static const size_t size = 4*1024;
 
 void* thread_shmem(void* p) {
 
@@ -2614,8 +1644,6 @@ int main(int argc, char **argv) {
 	if (publishCount != 0) {
 		infinitePublishFlag = false;
 	}
-	
-	//ReloadSpiFlashInitParam();
 	
 	//print_json(buffer_start, );
 

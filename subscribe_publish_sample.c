@@ -1393,7 +1393,9 @@ void gestProtocolFD(int byte[], int n) {
 			if (p_shmem_cenlin->new_message == 2) {
 				//invio la risposta corretta che ho ricevuto dalla cenlin
 				i=0;
-				while(p_shmem_cenlin->message[i]!=0xFE) {
+				//while(p_shmem_cenlin->message[i]!=0xFE) {
+				int lenRx = p_shmem_cenlin->message[4]*255 + p_shmem_cenlin->message[5];
+				for(i=0; i<lenRx+7; i++){
 					bufferTx[i]=p_shmem_cenlin->message[i];
 					i++;
 				}

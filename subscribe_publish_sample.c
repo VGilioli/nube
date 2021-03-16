@@ -141,6 +141,8 @@ struct shmem_cenlin {
 };
 
 struct shmem_cenlin* p_shmem_cenlin;
+AWS_IoT_Client client;
+
 // --------------------------------------------
 
 #define NUM_BLOCK 32
@@ -1177,7 +1179,7 @@ unsigned char changed[256];
  * @brief This parameter will avoid infinite loop of publish and exit the program after certain number of publishes
  */
 static uint32_t publishCount = 0;
-static int bufferTx[20];
+static unsigned char  bufferTx[500];
 
 #define MAX_LEN_SHADOW 5*1024
 
@@ -1188,15 +1190,16 @@ static char json_string[MAX_LEN_SHADOW+1] = {};
 
 void convertStringToByte(char* st, int byte[]);
 bool checkCRC(int byte[]);
-unsigned char calcCRC(int byte[]);
+unsigned char calcCRC(unsigned char byte[]);
 void gestOpcodeMain(int byte[]);
 void gestOpcodeWIFI(int byte[]);
 void gestCmdPassThrough(int byte[]);
-void print_json_command(int msg[]);
+void print_json_command_lo(unsigned char msg[]);
+void print_json_command_fd(unsigned char msg[]);
 void gestProtocolFD(int byte[], int n);
 
-static bool flag_tx_json_command = false;
-
+static bool flag_tx_json_command_fd = false;
+static bool flag_tx_json_command_lo = false;
 
 
 static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, uint16_t topicNameLen,
@@ -1265,9 +1268,9 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 			else gestOpcodeMain(byteF);
 			
 			//mando la risposta
-			flag_tx_json_command=TRUE;
+			flag_tx_json_command_lo = TRUE;
 
-		}else printf("CRC ERROR\n");
+		} else printf("CRC ERROR\n");
 	} else if((char_1 == 'F')&&(char_2 = 'D' )) {
 		printf("Gestione protocollo FD\n");	
 		//devo rigirare il messaggio senza lo stuffing che è previsto nel protocollo.
@@ -1291,23 +1294,23 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 			printf("vado a fare la copia in shared \n");
 			gestProtocolFD(byteF,j);
 			//mando la risposta
-			flag_tx_json_command=TRUE;
-		}else printf("ERROR RX FD PROTOCOL\n");
+			flag_tx_json_command_fd = TRUE;
+		} else printf("ERROR RX FD PROTOCOL\n");
 	} else {
-		printf("Protocollo command non riconosciuto !!!! ");
+		printf("Tipo protocollo command non riconosciuto !!!! ");
 	}
 	
 }
 
 
-void print_json_command(int msg[]) {
+void print_json_command_lo(unsigned char msg[]) {
     int i = 0;
 	int j = 0;
 	char appo[MAX_LEN_SHADOW+1];
 	
 	sprintf(json_string, "{\"frame\":\"" );
 	
-	for (j=0; j < msg[0]; j++){
+	for (j=0; j < msg[0]; j++) {
 		sprintf(appo, "%02X", msg[j]);
 		strcat(json_string, appo);	
 	}
@@ -1321,9 +1324,32 @@ void print_json_command(int msg[]) {
 
 	sprintf(appo, "}");
 	strcat(json_string, appo);
-	printf("json CUCONFIG is : %s \n", json_string);
+	printf("json RESPONSE is : %s \n", json_string);
 }
 
+void print_json_command_fd(unsigned char msg[]) {
+    int i = 0;
+	int j = 0;
+	char appo[MAX_LEN_SHADOW+1];
+	
+	sprintf(json_string, "{\"frame\":\"" );
+	
+	for (j=0; j < ((msg[4]<<8|msg[5])+7); j++) {
+		sprintf(appo, "%02X", msg[j]);
+		strcat(json_string, appo);	
+	}
+	sprintf(appo, "\",");
+	strcat(json_string, appo);	
+
+    //aggiungo "cu_id":"99998","cu_type":"logicafm"
+	sprintf(appo, "\"cu_id\":\"%5d\",\"cu_type\":\"logicafm\"", Etichetta);
+	strcat(json_string, appo);	
+
+
+	sprintf(appo, "}");
+	strcat(json_string, appo);
+	printf("json RESPONSE is : %s \n", json_string);
+}
 
 void convertStringToByte(char* st, int byte[]) {
     
@@ -1355,7 +1381,7 @@ bool checkCRC(int byte[]){
 	 else return FALSE;	 
 }
 
-unsigned char calcCRC(int byte[]){
+unsigned char calcCRC(unsigned char byte[]){
      
 	 unsigned char sum = 0;
 	 int len = byte[0];
@@ -1374,16 +1400,10 @@ void gestProtocolFD(int byte[], int n) {
 			printf("TX MSG FD TO CENLIN: ");
 			p_shmem_cenlin->message[0] = OPCODE_PROTOCOL_FD;
 			printf("%02X",p_shmem_cenlin->message[0]);
-			//while(byte[i]!=0xFE){
 			for (i=1; i<n; i++) {
 				p_shmem_cenlin->message[i+1] = byte[i];
 				printf("%02X",p_shmem_cenlin->message[i+1]);
-				//i++;
 			}
-			//i++;
-			//p_shmem_cenlin->message[i+1] = byte[i];
-			//printf("%d\n",p_shmem_cenlin->message[i+1]);
-
 
 			//Dovro gestire la risposta che mi arriverà dalla cenlin ????
 			while((p_shmem_cenlin->new_message != 2)&&(timeout<10)){//mi aspetto 2 dalla cenlin metto 5 secondi di timeout
@@ -1391,25 +1411,23 @@ void gestProtocolFD(int byte[], int n) {
 				timeout++;
 			}
 			if (p_shmem_cenlin->new_message == 2) {
+			
 				//invio la risposta corretta che ho ricevuto dalla cenlin
-				i=0;
-				while(i < ((p_shmem_cenlin->message[4]<<8|p_shmem_cenlin->message[5])+4)) {
-					bufferTx[i]=p_shmem_cenlin->message[i];
-					i++;
-				}
-				printf("La risposta a nube è di %d caratteri\n", i);
+				int lenRx = p_shmem_cenlin->message[4]*255 + p_shmem_cenlin->message[5];
+				memcpy(&bufferTx[0], &p_shmem_cenlin->message[0], lenRx+7);
+				printf("La risposta a nube è di %d caratteri : 0x%02X 0x%02X \n", lenRx+7, bufferTx[0], bufferTx[1]);
+
+			
 			} else {
+			
 				bufferTx[0]=0x04;//numBytes 
 				bufferTx[1]=0x01;//ctrlCode ERRORE OPCODE NON GESTITO = 0x01
  				bufferTx[2]=OPCODE_PROTOCOL_FD; //ripeto l'opcode nella risposta
 				bufferTx[3]=calcCRC(bufferTx);//CRC 
 				//invio un messaggio di errore
+			
 			}
 
-			//bufferTx[0]=0x04;//numBytes 
-			//bufferTx[1]=0x00;//ctrlCode 
- 			//bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
-			//bufferTx[3]=calcCRC(bufferTx);//CRC 
 }
 
 
@@ -2441,7 +2459,9 @@ void* thread_shmem(void* p) {
 
 	while (1) {
 		printf("Controllo se ci sono stati cambiamenti nei %d nodi presenti  \n\n", p_shmem_cenlin->gTotNodi);
-		sleep(10);
+		//Max time the yield function will wait for read messages
+		aws_iot_mqtt_yield(&client, 100);
+		sleep(1);
 	}
 
 }
@@ -2490,8 +2510,7 @@ int main(int argc, char **argv) {
     //	Load etichetta CenLin
     Etichetta = ReadEtichettaCentrale ();
     printf("Etichetta is %d \n", Etichetta);
-
-
+	setvbuf(stdout, NULL, _IONBF, 0); // turn off buffering for stdout
 	printf("create thread \n");
 	res = pthread_create(&id_thread0, NULL, thread_shmem, NULL);
 	if (res != 0) {
@@ -2501,7 +2520,7 @@ int main(int argc, char **argv) {
 	sleep(10);
 	IoT_Error_t rc = FAILURE;
 
-	AWS_IoT_Client client;
+	//AWS_IoT_Client client;
 	IoT_Client_Init_Params mqttInitParams = iotClientInitParamsDefault;
 	IoT_Client_Connect_Params connectParams = iotClientConnectParamsDefault;
 
@@ -2612,14 +2631,15 @@ int main(int argc, char **argv) {
 	while((NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc)
 		  && (publishCount > 0 || infinitePublishFlag)) {
 
-
+/*
 		//Max time the yield function will wait for read messages
 		rc = aws_iot_mqtt_yield(&client, 100);
 		if(NETWORK_ATTEMPTING_RECONNECT == rc) {
 			// If the client is attempting to reconnect we will skip the rest of the loop.
 			continue;
 		}
-		
+*/
+
 		cnt_cicle++;
 		printf("publishCount is %d(%d) infinitePublishFlag is %d \n", publishCount, cnt_cicle, infinitePublishFlag);	  
 
@@ -2694,12 +2714,26 @@ int main(int argc, char **argv) {
 		}
 		
 
-		if (flag_tx_json_command == TRUE) {
-			flag_tx_json_command = FALSE;
-			print_json_command(bufferTx);
+		if (flag_tx_json_command_lo == TRUE) {
+			flag_tx_json_command_lo = FALSE;
+			print_json_command_lo(bufferTx);
 			sprintf(cPayload, "%s", json_string);
 			//printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(json_string));//, json_string);
-			printf("Send shadow command (len %d )  \n", strlen(cPayload));
+			printf("Send shadow command lo (len %d )  \n", strlen(cPayload));
+			paramsQOS0.payloadLen = strlen(cPayload);
+			sprintf(str_topic_shadow, "logicafm_%5d/response", Etichetta);
+			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+			printf("Publish returned : %d \n", rc);
+		}
+		
+
+		if (flag_tx_json_command_fd == TRUE) {
+			flag_tx_json_command_fd = FALSE;
+			print_json_command_fd(bufferTx);
+			sprintf(cPayload, "%s", json_string);
+			//printf("Send shadow cuconfig %d (len %d )  \n", i, strlen(json_string));//, json_string);
+			printf("Send shadow command fd (len %d )  \n", strlen(cPayload));
 			paramsQOS0.payloadLen = strlen(cPayload);
 			sprintf(str_topic_shadow, "logicafm_%5d/response", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
@@ -2825,7 +2859,7 @@ int main(int argc, char **argv) {
 			publishCount--;
 		}
 		*/
-		sleep(1);
+		sleep(10);
 	}
 
 	// Wait for all the messages to be received vittorio

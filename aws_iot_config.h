@@ -21,6 +21,10 @@
 #ifndef SRC_SHADOW_IOT_SHADOW_CONFIG_H_
 #define SRC_SHADOW_IOT_SHADOW_CONFIG_H_
 
+
+// This configuration macro needs to be available globally to enable threading
+//#define _ENABLE_THREAD_SUPPORT_
+
 // Get from console
 // =================================================
 #define AWS_IOT_MQTT_HOST              "" ///< Customer specific MQTT HOST. The same will be used for Thing Shadow

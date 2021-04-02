@@ -126,6 +126,8 @@ struct shmem_cenlin {
 struct shmem_cenlin* p_shmem_cenlin;
 AWS_IoT_Client client;
 
+int fd_fifo; 
+char * myfifo = "/home/root/IOT/fifoNube"; 
 // --------------------------------------------
 
 #define NUM_BLOCK 32
@@ -396,7 +398,7 @@ static void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicN
 		printf("Gestione protocollo LD len = %d\n",numBytes);
 
 		for (int i=0; i<numBytes; i++){
-			printf("byte[%d] = %d\n",i,byteF[i]);
+			printf("byte[%d] = 0x%02X\n",i,byteF[i+2]);
 			byteF[i]=byteF[i+2];
 		}
 
@@ -495,13 +497,14 @@ void convertStringToByte(char* st, int byte[]) {
     
     int i;
     char stTemp[2];
+	int len;
  
-    //Sul primo byte ho la lunghezza
-    strncpy(stTemp,st,2);
-    byte[0]=strtol(stTemp, NULL, 16);
+    //Sul primo byte dati (dopo LO o FD) ho la lunghezza
+    strncpy(stTemp,st+4, 2);
+    len = strtol(stTemp, NULL, 16) + 2;
     
     //ciclo ora sulla lunghezza  
-    for (i=1; i<byte[0]; i++){
+    for (i=0; i<len; i++){
         strncpy(stTemp,st+(i*2),2);
         byte[i]=strtol(stTemp, NULL, 16);
     }
@@ -521,7 +524,7 @@ bool checkCRC(int byte[]){
 	 else return FALSE;	 
 }
 
-unsigned char calcCRC(unsigned char byte[]){
+unsigned char calcCRC(unsigned char byte[]) {
      
 	 unsigned char sum = 0;
 	 int len = byte[0];
@@ -536,7 +539,7 @@ void gestProtocolFD(int byte[], int n) {
 			int i = 0;
 			int timeout = 0;
 			//devo passare i dati alla cenlin
-			p_shmem_cenlin->new_message = 1;
+			
 			printf("TX MSG FD TO CENLIN: ");
 			p_shmem_cenlin->message[0] = OPCODE_PROTOCOL_FD;
 			printf("%02X",p_shmem_cenlin->message[0]);
@@ -544,9 +547,12 @@ void gestProtocolFD(int byte[], int n) {
 				p_shmem_cenlin->message[i+1] = byte[i];
 				printf("%02X",p_shmem_cenlin->message[i+1]);
 			}
+			p_shmem_cenlin->new_message = 1;
+        	//triggher Cenlinsoftware
+			write(fd_fifo, "hello", sizeof("hello")); 
 
 			//Dovro gestire la risposta che mi arriverà dalla cenlin ????
-			while((p_shmem_cenlin->new_message != 2)&&(timeout<10)){//mi aspetto 2 dalla cenlin metto 5 secondi di timeout
+			while((p_shmem_cenlin->new_message != 2)&&(timeout<10)) {//mi aspetto 2 dalla cenlin metto 5 secondi di timeout
 				sleep(1);
 				timeout++;
 			}
@@ -557,7 +563,6 @@ void gestProtocolFD(int byte[], int n) {
 				memcpy(&bufferTx[0], &p_shmem_cenlin->message[0], lenRx+7);
 				printf("La risposta a nube è di %d caratteri : 0x%02X 0x%02X \n", lenRx+7, bufferTx[0], bufferTx[1]);
 
-			
 			} else {
 			
 				bufferTx[0]=0x04;//numBytes 
@@ -691,7 +696,7 @@ void gestOpcodeMain(int byte[]){
 		case OPCODE_SET_TIM_TEST_FUNZIONALE:
 			printf("RX IMPOSTA TIMER TEST FUNZIONALE\n"); //0x12
 			//devo passare i dati alla cenlin
-			p_shmem_cenlin->new_message = 1;
+			
 			p_shmem_cenlin->message[0] = OPCODE_SET_TIM_TEST_FUNZIONALE;
 			p_shmem_cenlin->message[1] = byte[3];
 			p_shmem_cenlin->message[2] = byte[4];
@@ -699,8 +704,8 @@ void gestOpcodeMain(int byte[]){
 			p_shmem_cenlin->message[4] = byte[6];
 			p_shmem_cenlin->message[5] = byte[7];
 			p_shmem_cenlin->message[6] = byte[8];
-
-			//preparo la risposta 
+			p_shmem_cenlin->new_message = 1;
+			write(fd_fifo, "hello", sizeof("hello")); 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode 
  			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
@@ -710,7 +715,6 @@ void gestOpcodeMain(int byte[]){
 		case OPCODE_SET_TIM_TEST_AUTONOMIA:
 			printf("RX IMPOSTA TIMER TEST AUTONOMIA\n"); //0x13
 			//devo passare i dati alla cenlin
-			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = OPCODE_SET_TIM_TEST_AUTONOMIA; 
 			//cambiato il protocollo rispetto alle impostazioni di modestino: non passo i secondi in 4 byte ma
 			//ora minuto secondi giorno mese anno N.B. l'ordine potrebbe non essere quello indicato. 
@@ -720,8 +724,8 @@ void gestOpcodeMain(int byte[]){
 			p_shmem_cenlin->message[4] = byte[6];
 			p_shmem_cenlin->message[5] = byte[7];
 			p_shmem_cenlin->message[6] = byte[8];
-
-			//preparo la risposta 
+			p_shmem_cenlin->new_message = 1;
+			write(fd_fifo, "hello", sizeof("hello")); 			//preparo la risposta 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode 
  			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
@@ -731,14 +735,13 @@ void gestOpcodeMain(int byte[]){
 		case OPCODE_SET_PERIOD_TEST_FUNZIONALE:
 			printf("RX IMPOSTA PERIODO TEST FUNZIONALE\n"); //0x14
 			//devo passare i dati alla cenlin
-			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = OPCODE_SET_PERIOD_TEST_FUNZIONALE;
 			p_shmem_cenlin->message[1] = byte[3];
 			p_shmem_cenlin->message[2] = byte[4];
 			p_shmem_cenlin->message[3] = byte[5];
 			p_shmem_cenlin->message[4] = byte[6];
-
-			//preparo la risposta 
+			p_shmem_cenlin->new_message = 1;
+			write(fd_fifo, "hello", sizeof("hello")); 			//preparo la risposta 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode 
  			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
@@ -748,14 +751,13 @@ void gestOpcodeMain(int byte[]){
 		case OPCODE_SET_PERIOD_TEST_AUTONOMIA: //0x15
 			printf("RX IMPOSTA PERIODO TEST AUTONOMIA\n"); //0x15
 			//devo passare i dati alla cenlin
-			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = OPCODE_SET_PERIOD_TEST_AUTONOMIA;
 			p_shmem_cenlin->message[1] = byte[3];
 			p_shmem_cenlin->message[2] = byte[4];
 			p_shmem_cenlin->message[3] = byte[5];
 			p_shmem_cenlin->message[4] = byte[6];
-
-			//preparo la risposta 
+			p_shmem_cenlin->new_message = 1;
+			write(fd_fifo, "hello", sizeof("hello")); 			//preparo la risposta 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode 
  			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
@@ -781,12 +783,11 @@ void gestOpcodeMain(int byte[]){
 			printf("RX OPCODE_SET NOME IMPIANTO\n");
 
 			//devo passare i dati alla cenlin
-			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = OPCODE_SET_NOME_IMPIANTO;
 			for (int i=3;i<byte[0]-1;i++)
 				p_shmem_cenlin->message[i-2] = byte[i];
-
-			//preparo la risposta 
+			p_shmem_cenlin->new_message = 1;
+			write(fd_fifo, "hello", sizeof("hello")); 			//preparo la risposta 			//preparo la risposta 
 			bufferTx[0]=0x04;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode 
  			bufferTx[2]=byte[2]; //ripeto l'opcode nella risposta
@@ -843,11 +844,10 @@ void gestCmdPassThrough(int byte[]){
 			printf("TEST FUNZIONALE\n");
 			
 			//devo chiedere l'esecuzione del test funzionale...
-			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
 			p_shmem_cenlin->message[1] = 41;
-
-			//preparo la risposta 
+			p_shmem_cenlin->new_message = 1;
+			write(fd_fifo, "hello", sizeof("hello")); 			//preparo la risposta 			//preparo la risposta 
 			bufferTx[0]=0x07;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode
 			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
@@ -861,11 +861,10 @@ void gestCmdPassThrough(int byte[]){
 			printf("TEST Autonomia 1H\n");
 			
 			//devo chiedere l'esecuzione del test autonomia...
-			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
 			p_shmem_cenlin->message[1] = 42;
-
-			//preparo la risposta 
+			p_shmem_cenlin->new_message = 1;
+			write(fd_fifo, "hello", sizeof("hello")); 			//preparo la risposta 			//preparo la risposta 
 			bufferTx[0]=0x07;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode
 			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
@@ -879,11 +878,10 @@ void gestCmdPassThrough(int byte[]){
 			printf("TEST Stop test\n");
 			
 			//devo chiedere l'esecuzione dello stop test ...
-			p_shmem_cenlin->new_message = 1;
 			p_shmem_cenlin->message[0] = 0x01;
 			p_shmem_cenlin->message[1] = 43;
-
-			//preparo la risposta 
+			p_shmem_cenlin->new_message = 1;
+			write(fd_fifo, "hello", sizeof("hello")); 			//preparo la risposta 			//preparo la risposta 
 			bufferTx[0]=0x07;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode
 			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
@@ -952,14 +950,14 @@ void gestCmdPassThrough(int byte[]){
 		case SUBCODE_SET_CONFIG_LAMP_MULTI: //0x12
 		
 			//devo passare i dati alla cenlin
-			p_shmem_cenlin->new_message = 1;
+
 			p_shmem_cenlin->message[0] = 0x40;
 			p_shmem_cenlin->message[1] = 0x12;
 
 			for (int i=4;i<byte[0]-1;i++)
 				p_shmem_cenlin->message[i-2] = byte[i];
-
-		    //preparo la risposta 
+			p_shmem_cenlin->new_message = 1;
+			write(fd_fifo, "hello", sizeof("hello")); 			//preparo la risposta 		    //preparo la risposta 
 			bufferTx[0]=0x05;//numBytes 
 			bufferTx[1]=0x00;//ctrlCode
 			bufferTx[2]=OPCODE_LG_CMD_PASS_THROUGH; //ripeto l'opcode nella risposta
@@ -1315,8 +1313,8 @@ void print_json_cuconfig(void) {
 	int j = 0;
 	char appo[MAX_LEN_SHADOW+1];
 	//In una shadow da 5K ci stanno 40 msg da 128 bytes facciamo 30 per sicurezza 
-	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"update\":\"completed\",\"blocks_modified\":\"", Etichetta );
-	
+	sprintf(json_string, "{\"state\":{\"reported\":{\"cu_type\":\"logicafm\",\"cu_id\":\"%5d\",\"numLamp\":%d,\"update\":\"completed\",\"blocks_modified\":\"", Etichetta, p_shmem_cenlin->gTotNodi );
+		
 	for (j=0; j < (NUM_BLOCK*LEN_BLOCK/8); j++){
 		sprintf(appo, "%02X", changed[j]);
 		strcat(json_string, appo);	
@@ -1458,11 +1456,11 @@ unsigned char compare_buffers(char *buffer, char *buffer1, unsigned int filesize
 	for(i=0; i<(filesize/LEN_BLOCK); i++ ) {
 		//printf("Comparazione blocco %d \n", i);
 		if(0 != memcmp(buffer+LEN_BLOCK*i, buffer1+LEN_BLOCK*i, LEN_BLOCK)) {
-			printf("Blocco %d cambiato\n", i);
 			n = (i/8);
 			k = (i%8);
-			changed[n] = (changed[n]|(1>>k));
+			changed[n] = (changed[n]|(1<<k));
 			diff=1;
+			printf("Blocco %d cambiato\n", i);
 		} else {
 			//printf("Blocco %d invariato\n", i);
 		}
@@ -1470,7 +1468,9 @@ unsigned char compare_buffers(char *buffer, char *buffer1, unsigned int filesize
 	return diff;
 }
 
-
+//non sono riuscito ad abilitare il mutithread support in aws_iot_config.h 
+//per il momento tento di risolvere così
+pthread_mutex_t aws_funct_mutex;
 
 ////static const size_t size = 4*1024;
 
@@ -1488,10 +1488,12 @@ void* thread_shmem(void* p) {
 	p_shmem_cenlin = (struct shmem_cenlin *) shmat(shmid_cenlin, 0, SHM_RND);
 
 	while (1) {
-		printf("Controllo se ci sono stati cambiamenti nei %d nodi presenti  \n\n", p_shmem_cenlin->gTotNodi);
+		//printf("Controllo se ci sono stati cambiamenti nei %d nodi presenti  \n\n", p_shmem_cenlin->gTotNodi);
 		//Max time the yield function will wait for read messages
+		pthread_mutex_lock(&aws_funct_mutex);
 		aws_iot_mqtt_yield(&client, 100);
-		sleep(1);
+		pthread_mutex_unlock(&aws_funct_mutex);
+		usleep(200000);
 	}
 
 }
@@ -1518,6 +1520,8 @@ int is_cnfg_file_modified(void) {
 }
 
 int main(int argc, char **argv) {
+
+
 	bool infinitePublishFlag = true;
 	unsigned int len_file = 0;
 	char rootCA[PATH_MAX + 1];
@@ -1541,11 +1545,27 @@ int main(int argc, char **argv) {
     Etichetta = ReadEtichettaCentrale ();
     printf("Etichetta is %d \n", Etichetta);
 	setvbuf(stdout, NULL, _IONBF, 0); // turn off buffering for stdout
-	printf("create thread \n");
+	printf("StdOut buffer OFF \n");
+	if(0 > mkfifo(myfifo, 0666)) {
+		perror("Make fifo Error ");
+		system("rm /home/root/IOT/fifoNube");
+		printf("cancello la fifo e riprovo : %d ", mkfifo(myfifo, 0666)); 
+	}
+	//attenzione, questa è bloccante finchè non la apro anche in lettura !!!!!!!!!!!!!!
+	fd_fifo = open(myfifo, O_WRONLY); 
+	if(fd_fifo < 0) {
+		perror("Open Fifo ERROR : ");
+	} else {
+		printf("Fifo fd is %d \n", fd_fifo);
+	}
+
+
 	res = pthread_create(&id_thread0, NULL, thread_shmem, NULL);
 	if (res != 0) {
-		printf("Failed creation thread - thread_shmem\n");
+		printf("Failed creation id_thread0 - thread_shmem\n");
 		return 0;
+	} else {
+		printf("id_thread0 shmem created \n");
 	}
 	sleep(10);
 	IoT_Error_t rc = FAILURE;
@@ -1692,17 +1712,19 @@ int main(int argc, char **argv) {
 			while (i < num_shadow) {
 				//IOT_INFO("Publish Shadow%02d of %02d(len is %d)\n", i, num_shadow, len_file);
 				//create_json_shadow_0();
-				//printf("changed %d is %d \n", i, changed[i]);
+				printf("changed %d is %d \n", i, changed[i]);
 				if((changed[i*4] != 0) || (changed[i*4+1] != 0 ) || (changed[i*4+2] != 0) || (changed[i*4+3] != 0)) {
 					print_json(buffer_start, i);
 					//sleep(1);
 					sprintf(cPayload, "%s", json_string);
-					printf("Send shadow %d (len %d )  %s \n", i, strlen(json_string), json_string);
+					printf("Send shadow blocco mem %d (len %d )  %s \n", i, strlen(json_string), json_string);
 					//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 					paramsQOS0.payloadLen = strlen(cPayload);
 					sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/param%02d/update", Etichetta, i);
 					//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+					pthread_mutex_lock(&aws_funct_mutex);
 					rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+					pthread_mutex_unlock(&aws_funct_mutex);
 					printf("Publish returned : %d \n", rc);
 					published |= SHADOW_CONFIG_PUBLISHED;
 				}	
@@ -1718,7 +1740,9 @@ int main(int argc, char **argv) {
 			paramsQOS0.payloadLen = strlen(cPayload);
 			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/status/update", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+			pthread_mutex_lock(&aws_funct_mutex);
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+			pthread_mutex_unlock(&aws_funct_mutex);
 			printf("Publish returned : %d \n", rc);
 			if(p_shmem_cenlin->status_changed)
 				published |= SHADOW_STATUS_BASE_STATUS_PUBLISHED;
@@ -1734,7 +1758,9 @@ int main(int argc, char **argv) {
 			paramsQOS0.payloadLen = strlen(cPayload);
 			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/errors/update", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+			pthread_mutex_lock(&aws_funct_mutex);
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+			pthread_mutex_unlock(&aws_funct_mutex);
 			printf("Publish returned : %d \n", rc);
 			if(p_shmem_cenlin->errors_changed)
 				published |= SHADOW_STATUS_BASE_ERROR_PUBLISHED;
@@ -1751,7 +1777,9 @@ int main(int argc, char **argv) {
 			paramsQOS0.payloadLen = strlen(cPayload);
 			sprintf(str_topic_shadow, "logicafm_%5d/response", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+			pthread_mutex_lock(&aws_funct_mutex);
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+			pthread_mutex_unlock(&aws_funct_mutex);
 			printf("Publish returned : %d \n", rc);
 		}
 		
@@ -1765,7 +1793,9 @@ int main(int argc, char **argv) {
 			paramsQOS0.payloadLen = strlen(cPayload);
 			sprintf(str_topic_shadow, "logicafm_%5d/response", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+			pthread_mutex_lock(&aws_funct_mutex);
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+			pthread_mutex_unlock(&aws_funct_mutex);
 			printf("Publish returned : %d \n", rc);
 		}
 		
@@ -1785,7 +1815,9 @@ int main(int argc, char **argv) {
 			paramsQOS0.payloadLen = strlen(cPayload);
 			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_00/update", Etichetta, i);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+			pthread_mutex_lock(&aws_funct_mutex);
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+			pthread_mutex_unlock(&aws_funct_mutex);
 			printf("Publish returned : %d \n", rc);
 
 			if(p_shmem_cenlin->gTotNodi>248) {
@@ -1796,7 +1828,9 @@ int main(int argc, char **argv) {
 				paramsQOS0.payloadLen = strlen(cPayload);
 				sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_01/update", Etichetta);
 				//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+				pthread_mutex_lock(&aws_funct_mutex);
 				rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+				pthread_mutex_unlock(&aws_funct_mutex);
 				printf("Publish returned : %d \n", rc);
 			}
 
@@ -1808,7 +1842,9 @@ int main(int argc, char **argv) {
 				paramsQOS0.payloadLen = strlen(cPayload);
 				sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_02/update", Etichetta);
 				//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+				pthread_mutex_lock(&aws_funct_mutex);
 				rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+				pthread_mutex_unlock(&aws_funct_mutex);
 				printf("Publish returned : %d \n", rc);
 			}
 
@@ -1819,8 +1855,10 @@ int main(int argc, char **argv) {
 				//printf("Send shadow %d (len %d ) : %s  \n", i, strlen(cPayload), cPayload);
 				paramsQOS0.payloadLen = strlen(cPayload);
 				sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/energy_time_03/update", Etichetta);
-				//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );					
+				//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );		
+				pthread_mutex_lock(&aws_funct_mutex);			
 				rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);																																																																	
+				pthread_mutex_unlock(&aws_funct_mutex);
 				printf("Publish returned : %d \n", rc);
 			}																																																																																																																										
 
@@ -1832,7 +1870,9 @@ int main(int argc, char **argv) {
 			sprintf(cPayload, "%s", json_string);	
 			paramsQOS0.payloadLen = strlen(cPayload);
 			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/status/update", Etichetta);
+			pthread_mutex_lock(&aws_funct_mutex);
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+			pthread_mutex_unlock(&aws_funct_mutex);
 			printf("Publish returned : %d \n", rc);
 			published &=~SHADOW_ENERGY_TIME_PUBLISHED;
 		}
@@ -1846,7 +1886,9 @@ int main(int argc, char **argv) {
 			paramsQOS0.payloadLen = strlen(cPayload);
 			sprintf(str_topic_shadow, "$aws/things/logicafm_%5d/shadow/name/cuconfig/update", Etichetta);
 			//IOT_INFO("sending : %s on %s\n",cPayload, str_topic_shadow );
+			pthread_mutex_lock(&aws_funct_mutex);
 			rc = aws_iot_mqtt_publish(&client, str_topic_shadow, strlen(str_topic_shadow), &paramsQOS0);
+			pthread_mutex_unlock(&aws_funct_mutex);
 			printf("Publish returned : %d \n", rc);
 			published = 0;
 		}
@@ -1887,7 +1929,7 @@ int main(int argc, char **argv) {
 			publishCount--;
 		}
 		*/
-		sleep(10);
+		sleep(1);
 	}
 
 	// Wait for all the messages to be received vittorio
